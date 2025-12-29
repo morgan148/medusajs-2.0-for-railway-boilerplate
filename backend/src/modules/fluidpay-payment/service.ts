@@ -2,17 +2,17 @@ import {
     AbstractPaymentProvider,
     AuthorizePaymentInput,
     AuthorizePaymentOutput,
-    CancelPaymentInput,
-    CancelPaymentOutput,
     CapturePaymentInput,
     CapturePaymentOutput,
     RefundPaymentInput,
     RefundPaymentOutput,
     UpdatePaymentInput,
     UpdatePaymentOutput,
+    CancelPaymentInput,
+    CancelPaymentOutput,
     GetWebhookActionAndDataInput,
     WebhookActionResult,
-  } from "@medusajs/framework/payment"
+  } from "@medusajs/framework"
   
   type FluidPayOptions = {
     baseUrl?: string
