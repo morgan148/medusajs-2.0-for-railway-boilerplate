@@ -117,22 +117,37 @@ const medusaConfig = {
         ]
       }
     }] : []),
-    ...(STRIPE_API_KEY && STRIPE_WEBHOOK_SECRET ? [{
+    {
       key: Modules.PAYMENT,
-      resolve: '@medusajs/payment',
+      resolve: "@medusajs/payment",
       options: {
         providers: [
+          // Stripe (optional)
+          ...(STRIPE_API_KEY && STRIPE_WEBHOOK_SECRET
+            ? [
+                {
+                  resolve: "@medusajs/payment-stripe",
+                  id: "stripe",
+                  options: {
+                    apiKey: STRIPE_API_KEY,
+                    webhookSecret: STRIPE_WEBHOOK_SECRET,
+                  },
+                },
+              ]
+            : []),
+    
+          // FluidPay (always included)
           {
-            resolve: '@medusajs/payment-stripe',
-            id: 'stripe',
+            resolve: "./src/modules/fluidpay-payment",
+            id: "fluidpay",
             options: {
-              apiKey: STRIPE_API_KEY,
-              webhookSecret: STRIPE_WEBHOOK_SECRET,
+              baseUrl: process.env.FLUIDPAY_BASE_URL,
+              secretKey: process.env.FLUIDPAY_SECRET_KEY,
             },
           },
         ],
       },
-    }] : [])
+    },
   ],
   plugins: [
   ...(MEILISEARCH_HOST && MEILISEARCH_ADMIN_KEY ? [{
