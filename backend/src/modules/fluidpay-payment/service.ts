@@ -30,6 +30,7 @@ class FluidPayProviderService extends AbstractPaymentProvider {
   async authorizePayment(input: any): Promise<any> {
     const { paymentSessionData, context } = input
     const token = paymentSessionData?.token
+    // Use the variable name you have in Railway
     const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey
     const baseUrl = this.getApiUrl()
 
@@ -66,8 +67,8 @@ class FluidPayProviderService extends AbstractPaymentProvider {
       if (!res.ok) {
         return { 
           status: "error", 
-          data: result || {}, 
-          error: result?.message || "FluidPay transaction failed"
+          data: result?.data || result || {}, 
+          error: result?.msg || result?.message || "FluidPay transaction failed"
         }
       }
 
