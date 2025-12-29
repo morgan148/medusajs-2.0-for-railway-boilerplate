@@ -1,25 +1,12 @@
 import AbstractPaymentProvider from "@medusajs/payment"
 
-import {
-  PaymentProviderAuthorizePaymentInput,
-  PaymentProviderAuthorizePaymentOutput,
-  PaymentProviderCapturePaymentInput,
-  PaymentProviderCapturePaymentOutput,
-  PaymentProviderRefundPaymentInput,
-  PaymentProviderRefundPaymentOutput,
-  PaymentProviderCancelPaymentInput,
-  PaymentProviderCancelPaymentOutput,
-  PaymentProviderUpdatePaymentInput,
-  PaymentProviderUpdatePaymentOutput,
-} from "@medusajs/types"
-
 type FluidPayOptions = {
   baseUrl?: string
   secretKey: string
 }
 
 export default class FluidPayPaymentProviderService
-  extends AbstractPaymentProvider<Record<string, unknown>> {
+  extends AbstractPaymentProvider {
 
   static identifier = "fluidpay"
 
@@ -33,14 +20,11 @@ export default class FluidPayPaymentProviderService
   /**
    * AUTHORIZE + CAPTURE IMMEDIATELY
    */
-  async authorizePayment(
-    input: PaymentProviderAuthorizePaymentInput
-  ): Promise<PaymentProviderAuthorizePaymentOutput> {
-
+  async authorizePayment(input: any): Promise<any> {
     const session = input.paymentSession
+
     const amount = session.amount
     const currency = session.currency_code
-
     const token = session.data?.token
 
     if (!token) {
@@ -53,11 +37,11 @@ export default class FluidPayPaymentProviderService
      * https://sandbox.fluidpay.com/docs/workflows/tokenizer-customer-payment
      */
 
-    // TEMP simulated transaction
+    // TEMP simulated success
     const transactionId = `fp_${Date.now()}`
 
     return {
-      status: "captured", // 👈 immediate charge
+      status: "captured", // authorize + capture immediately
       data: {
         transaction_id: transactionId,
         amount,
@@ -66,50 +50,32 @@ export default class FluidPayPaymentProviderService
     }
   }
 
-  /**
-   * No-op (already captured)
-   */
-  async capturePayment(
-    _input: PaymentProviderCapturePaymentInput
-  ): Promise<PaymentProviderCapturePaymentOutput> {
+  async capturePayment(_input: any): Promise<any> {
+    // no-op (already captured)
+    return { data: {} }
+  }
+
+  async cancelPayment(input: any): Promise<any> {
     return {
-      data: {},
+      data: input.payment?.data,
     }
   }
 
-  async cancelPayment(
-    input: PaymentProviderCancelPaymentInput
-  ): Promise<PaymentProviderCancelPaymentOutput> {
-    return {
-      data: input.payment.data,
-    }
-  }
-
-  async refundPayment(
-    input: PaymentProviderRefundPaymentInput
-  ): Promise<PaymentProviderRefundPaymentOutput> {
-
+  async refundPayment(input: any): Promise<any> {
     const { payment, amount } = input
-
-    /**
-     * TODO:
-     * Call FluidPay refund endpoint
-     */
 
     return {
       data: {
         refunded_amount: amount,
-        transaction_id: payment.data?.transaction_id,
+        transaction_id: payment?.data?.transaction_id,
       },
     }
   }
 
-  async updatePayment(
-    input: PaymentProviderUpdatePaymentInput
-  ): Promise<PaymentProviderUpdatePaymentOutput> {
+  async updatePayment(input: any): Promise<any> {
     return {
       data: {
-        ...input.payment.data,
+        ...input.payment?.data,
         ...input.data,
       },
     }
