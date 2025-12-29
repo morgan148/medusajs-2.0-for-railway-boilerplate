@@ -22,6 +22,8 @@ const FP_PROVIDER_ID = "pp_fluidpay_fluidpay"
 // For your “skip selection” goal, keep this false.
 const SHOW_PAYMENT_METHOD_CHOOSER = false
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 const Payment = ({
   cart,
   availablePaymentMethods,
@@ -50,7 +52,8 @@ const Payment = ({
 
   const isOpen = searchParams.get("step") === "payment"
 
-  const isStripe = isStripeFunc(activeSession?.provider_id)
+  // ✅ CHANGE #1: Stripe should be based on *selected* method, not any stale active session
+  const isStripeSelected = isStripeFunc(selectedPaymentMethod)
   const stripeReady = useContext(StripeContext)
 
   const paidByGiftcard =
@@ -90,7 +93,12 @@ const Payment = ({
     const hasFluidPay = availablePaymentMethods.some(
       (m: any) => m?.id === FP_PROVIDER_ID
     )
-    console.log("[Payment] hasFluidPay:", hasFluidPay, "FP_PROVIDER_ID:", FP_PROVIDER_ID)
+    console.log(
+      "[Payment] hasFluidPay:",
+      hasFluidPay,
+      "FP_PROVIDER_ID:",
+      FP_PROVIDER_ID
+    )
   }, [availablePaymentMethods])
 
   // Log key state snapshots when step/session/method changes
@@ -104,7 +112,7 @@ const Payment = ({
       selectedPaymentMethod,
       activeSessionProviderId: activeSession?.provider_id,
       activeSessionStatus: activeSession?.status,
-      isStripeSelected: isStripeFunc(selectedPaymentMethod),
+      isStripeSelected,
       isStripeActiveSession: isStripeFunc(activeSession?.provider_id),
       paymentSessions: cart?.payment_collection?.payment_sessions?.map((s: any) => ({
         provider_id: s?.provider_id,
@@ -121,6 +129,7 @@ const Payment = ({
     cart?.id,
     cart?.payment_collection?.payment_sessions,
     searchParams,
+    isStripeSelected,
   ])
 
   // Auto-select FluidPay when the Payment step is opened
@@ -181,8 +190,7 @@ const Payment = ({
   const handleSubmit = async () => {
     setIsLoading(true)
     try {
-      const shouldInputCard =
-        isStripeFunc(selectedPaymentMethod) && !activeSession
+      const shouldInputCard = isStripeSelected && !activeSession
 
       console.log("[Payment] handleSubmit clicked", {
         cartId: cart?.id,
@@ -209,8 +217,16 @@ const Payment = ({
         })
 
         console.log("[Payment] initiatePaymentSession completed")
+
+        // ✅ CHANGE #2: force a cart refresh *before* routing to review so the Review step
+        // sees the new pending session and doesn’t show “Select a payment method”
+        console.log("[Payment] router.refresh() after initiatePaymentSession")
+        router.refresh()
+        await sleep(250)
       } else {
-        console.log("[Payment] Skipping initiatePaymentSession because activeSession exists")
+        console.log(
+          "[Payment] Skipping initiatePaymentSession because activeSession exists"
+        )
       }
 
       if (!shouldInputCard) {
@@ -300,7 +316,7 @@ const Payment = ({
               )}
 
               {/* Stripe card element (only if Stripe is selected) */}
-              {isStripe && stripeReady && (
+              {isStripeSelected && stripeReady && (
                 <div className="mt-5 transition-all duration-150 ease-in-out">
                   <Text className="txt-medium-plus text-ui-fg-base mb-1">
                     Enter your card details:
@@ -347,12 +363,12 @@ const Payment = ({
             onClick={handleSubmit}
             isLoading={isLoading}
             disabled={
-              (isStripe && !cardComplete) ||
+              (isStripeSelected && !cardComplete) ||
               (!selectedPaymentMethod && !paidByGiftcard)
             }
             data-testid="submit-payment-button"
           >
-            {!activeSession && isStripeFunc(selectedPaymentMethod)
+            {!activeSession && isStripeSelected
               ? " Enter card details"
               : "Continue to review"}
           </Button>
@@ -387,9 +403,7 @@ const Payment = ({
                     )}
                   </Container>
                   <Text>
-                    {isStripeFunc(selectedPaymentMethod) && cardBrand
-                      ? cardBrand
-                      : "Another step will appear"}
+                    {isStripeSelected && cardBrand ? cardBrand : "Another step will appear"}
                   </Text>
                 </div>
               </div>
