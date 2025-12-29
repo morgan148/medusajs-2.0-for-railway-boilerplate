@@ -118,11 +118,18 @@ const Payment = ({
       const shouldInputCard =
         isStripeFunc(selectedPaymentMethod) && !activeSession
 
-      if (!activeSession) {
-        await initiatePaymentSession(cart, {
-          provider_id: selectedPaymentMethod,
-        })
-      }
+        if (!activeSession) {
+          console.log("Submitting payment session", {
+            cartId: cart?.id,
+            selectedPaymentMethod,
+            hasActiveSession: !!activeSession,
+            paymentSessions: cart?.payment_collection?.payment_sessions,
+          })
+        
+          await initiatePaymentSession(cart, {
+            provider_id: selectedPaymentMethod,
+          })
+        }
 
       if (!shouldInputCard) {
         return router.push(
