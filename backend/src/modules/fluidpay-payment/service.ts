@@ -1,4 +1,4 @@
-import AbstractPaymentProvider from "@medusajs/payment"
+import { PaymentProviderService } from "@medusajs/medusa"
 
 type FluidPayOptions = {
   baseUrl?: string
@@ -6,19 +6,19 @@ type FluidPayOptions = {
 }
 
 export default class FluidPayPaymentProviderService
-  extends AbstractPaymentProvider {
+  extends PaymentProviderService {
 
   static identifier = "fluidpay"
 
   protected options_: FluidPayOptions
 
   constructor(container, options: FluidPayOptions) {
-    super(container, options)
+    super(container)
     this.options_ = options
   }
 
   /**
-   * AUTHORIZE + CAPTURE IMMEDIATELY
+   * AUTHORIZE + CAPTURE (IMMEDIATE)
    */
   async authorizePayment(input: any): Promise<any> {
     const session = input.paymentSession
@@ -31,17 +31,11 @@ export default class FluidPayPaymentProviderService
       throw new Error("FluidPay token missing from payment session")
     }
 
-    /**
-     * TODO:
-     * Call FluidPay Tokenizer Customer Payment API
-     * https://sandbox.fluidpay.com/docs/workflows/tokenizer-customer-payment
-     */
-
-    // TEMP simulated success
+    // TODO: Replace with real FluidPay API call
     const transactionId = `fp_${Date.now()}`
 
     return {
-      status: "captured", // authorize + capture immediately
+      status: "captured",
       data: {
         transaction_id: transactionId,
         amount,
@@ -50,24 +44,19 @@ export default class FluidPayPaymentProviderService
     }
   }
 
-  async capturePayment(_input: any): Promise<any> {
-    // no-op (already captured)
+  async capturePayment(): Promise<any> {
     return { data: {} }
   }
 
   async cancelPayment(input: any): Promise<any> {
-    return {
-      data: input.payment?.data,
-    }
+    return { data: input.payment?.data }
   }
 
   async refundPayment(input: any): Promise<any> {
-    const { payment, amount } = input
-
     return {
       data: {
-        refunded_amount: amount,
-        transaction_id: payment?.data?.transaction_id,
+        refunded_amount: input.amount,
+        transaction_id: input.payment?.data?.transaction_id,
       },
     }
   }
