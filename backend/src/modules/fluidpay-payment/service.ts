@@ -26,14 +26,14 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     }
   }
 
-  // Hardened authorizePayment to satisfy Medusa's entity requirements
+  // Final Hardened authorization for Medusa 2.0
   async authorizePayment(input: any): Promise<any> {
     const { paymentSessionData, context } = input
     const token = paymentSessionData?.token
     const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey
     const baseUrl = this.getApiUrl()
 
-    // 1. Return 'error' status and required 'data' object if token is missing
+    // 1. Ensure status and data are never undefined
     if (!token) {
       return { 
         status: "error", 
@@ -62,10 +62,9 @@ class FluidPayProviderService extends AbstractPaymentProvider {
 
       const result = await res.json()
       
-      // ✅ Log exact API response for debugging in Railway logs
+      // ✅ Log exact API response for debugging
       console.log("[FluidPay API Response]:", JSON.stringify(result, null, 2))
       
-      // 2. Handle API failure: Return 'error' status and the result data
       if (!res.ok) {
         return { 
           status: "error", 
@@ -74,20 +73,21 @@ class FluidPayProviderService extends AbstractPaymentProvider {
         }
       }
 
-      // 3. SUCCESS: Must return 'captured' status and session data
-      // This resolves the "not authorized with provider" error.
-      return {
-        status: "captured",
+      // 2. Format the response specifically for Medusa's "Authorized" check
+      const successResponse = {
+        status: "captured", // Must be "captured" for immediate sale
         data: {
-          ...paymentSessionData,
+          ...paymentSessionData, // ✅ MERGE original data back
           fluidpay_id: result.data?.id,
           fluidpay_vault_id: result.data?.payment_method?.token,
-          // Include essential fields in data to ensure Medusa persists them
-          authorized_at: new Date().toISOString(),
         },
       }
+
+      // ✅ LOG: Confirm exactly what we are sending back to Medusa
+      console.log("[Medusa Authorize Return]:", JSON.stringify(successResponse, null, 2))
+      
+      return successResponse
     } catch (e: any) {
-      // 4. Global catch returns valid status and data to prevent backend crash
       return { 
         status: "error", 
         data: paymentSessionData || {}, 
