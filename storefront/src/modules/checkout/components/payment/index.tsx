@@ -16,6 +16,12 @@ import { isStripe as isStripeFunc, paymentInfoMap } from "@lib/constants"
 import { StripeContext } from "@modules/checkout/components/payment-wrapper"
 import { initiatePaymentSession } from "@lib/data/cart"
 
+const FP_PROVIDER_ID = "pp_fluidpay_fluidpay"
+
+// Set to true if you want to show the payment method chooser.
+// For your “skip selection” goal, keep this false.
+const SHOW_PAYMENT_METHOD_CHOOSER = false
+
 const Payment = ({
   cart,
   availablePaymentMethods,
@@ -53,6 +59,27 @@ const Payment = ({
   const paymentReady =
     (activeSession && cart?.shipping_methods.length !== 0) || paidByGiftcard
 
+  const isFluidPay = selectedPaymentMethod === FP_PROVIDER_ID
+
+  // Auto-select FluidPay when the Payment step is opened
+  useEffect(() => {
+    if (!isOpen) return
+    if (paidByGiftcard) return
+
+    // If it's already FluidPay, do nothing.
+    if (selectedPaymentMethod === FP_PROVIDER_ID) return
+
+    // If there is an active session already (e.g., returning to payment step),
+    // we respect it unless it's empty.
+    // But since you want FluidPay default, we’ll set it whenever it’s blank or manual.
+    const shouldForceFluidPay =
+      !selectedPaymentMethod || selectedPaymentMethod === "pp_system_default"
+
+    if (shouldForceFluidPay) {
+      setSelectedPaymentMethod(FP_PROVIDER_ID)
+    }
+  }, [isOpen, paidByGiftcard, selectedPaymentMethod])
+
   const useOptions: StripeCardElementOptions = useMemo(() => {
     return {
       style: {
@@ -74,7 +101,6 @@ const Payment = ({
     (name: string, value: string) => {
       const params = new URLSearchParams(searchParams)
       params.set(name, value)
-
       return params.toString()
     },
     [searchParams]
@@ -145,35 +171,38 @@ const Payment = ({
           </Text>
         )}
       </div>
+
       <div>
         <div className={isOpen ? "block" : "hidden"}>
-          {!paidByGiftcard && availablePaymentMethods?.length && (
+          {!paidByGiftcard && availablePaymentMethods?.length ? (
             <>
-              <RadioGroup
-                value={selectedPaymentMethod}
-                onChange={(value: string) => setSelectedPaymentMethod(value)}
-              >
-                {availablePaymentMethods
-                  .sort((a, b) => {
-                    return a.provider_id > b.provider_id ? 1 : -1
-                  })
-                  .map((paymentMethod) => {
-                    return (
-                      <PaymentContainer
-                        paymentInfoMap={paymentInfoMap}
-                        paymentProviderId={paymentMethod.id}
-                        key={paymentMethod.id}
-                        selectedPaymentOptionId={selectedPaymentMethod}
-                      />
-                    )
-                  })}
-              </RadioGroup>
-
-              {/* Load FluidPay tokenizer script when "Manual Payment" is selected */}
-              {selectedPaymentMethod === "pp_system_default" && (
-                <FluidPayTokenizerLoader srcBaseUrl={fpBaseUrl} />
+              {/* Payment method chooser (optional) */}
+              {SHOW_PAYMENT_METHOD_CHOOSER && (
+                <RadioGroup
+                  value={selectedPaymentMethod}
+                  onChange={(value: string) => setSelectedPaymentMethod(value)}
+                >
+                  {availablePaymentMethods
+                    .sort((a, b) => {
+                      return a.provider_id > b.provider_id ? 1 : -1
+                    })
+                    .map((paymentMethod) => {
+                      return (
+                        <PaymentContainer
+                          paymentInfoMap={paymentInfoMap}
+                          paymentProviderId={paymentMethod.id}
+                          key={paymentMethod.id}
+                          selectedPaymentOptionId={selectedPaymentMethod}
+                        />
+                      )
+                    })}
+                </RadioGroup>
               )}
 
+              {/* FluidPay tokenizer (default path) */}
+              {isFluidPay && <FluidPayTokenizerLoader srcBaseUrl={fpBaseUrl} />}
+
+              {/* Stripe card element (only if Stripe is selected) */}
               {isStripe && stripeReady && (
                 <div className="mt-5 transition-all duration-150 ease-in-out">
                   <Text className="txt-medium-plus text-ui-fg-base mb-1">
@@ -194,7 +223,7 @@ const Payment = ({
                 </div>
               )}
             </>
-          )}
+          ) : null}
 
           {paidByGiftcard && (
             <div className="flex flex-col w-1/3">
@@ -283,6 +312,7 @@ const Payment = ({
           ) : null}
         </div>
       </div>
+
       <Divider className="mt-8" />
     </div>
   )
