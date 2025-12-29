@@ -26,7 +26,7 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     }
   }
 
-  // Consolidated to a single 'input' object to match your base type error
+  // Logic updated to ensure 'status' is always returned to satisfy Medusa
   async authorizePayment(input: any): Promise<any> {
     const { paymentSessionData, context } = input
     const token = paymentSessionData?.token
@@ -34,7 +34,12 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     const baseUrl = this.getApiUrl()
 
     if (!token) {
-      return { error: "Missing FluidPay token", code: "missing_token" }
+      // ✅ Status "error" prevents the "non-undefined" backend crash
+      return { 
+        status: "error", 
+        error: "Missing FluidPay token", 
+        code: "missing_token" 
+      }
     }
 
     const amountCents = Math.round(context?.amount || paymentSessionData?.amount || 0)
@@ -47,17 +52,26 @@ class FluidPayProviderService extends AbstractPaymentProvider {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          type: "sale", 
+          type: "sale", // Immediate capture
           amount: amountCents,
           currency: (context?.currency_code || "USD").toUpperCase(),
           payment_method: { token },
-          vault_payment_method: true, 
+          vault_payment_method: true, // Support vaulting
         }),
       })
 
       const result = await res.json()
-      if (!res.ok) return { error: result?.message || "Failed" }
+      
+      if (!res.ok) {
+        // ✅ Explicitly return "error" status
+        return { 
+          status: "error", 
+          error: result?.message || "FluidPay transaction failed",
+          data: result 
+        }
+      }
 
+      // ✅ SUCCESS: Status "captured" indicates funds are settled
       return {
         status: "captured",
         data: {
@@ -66,7 +80,11 @@ class FluidPayProviderService extends AbstractPaymentProvider {
         },
       }
     } catch (e: any) {
-      return { error: e.message }
+      // ✅ Global error catch returns "error" status
+      return { 
+        status: "error", 
+        error: e.message 
+      }
     }
   }
 
@@ -90,9 +108,11 @@ class FluidPayProviderService extends AbstractPaymentProvider {
 
   async cancelPayment(input: any): Promise<any> {
     const transactionId = input.paymentData.fluidpay_id
+    const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey
+
     await fetch(`${this.getApiUrl()}/transaction/${transactionId}/void`, {
       method: "POST",
-      headers: { "Authorization": process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey },
+      headers: { "Authorization": apiKey },
     })
     return { status: "cancelled", data: input.paymentData }
   }
