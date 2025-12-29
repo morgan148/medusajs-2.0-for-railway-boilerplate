@@ -15,35 +15,30 @@ const FluidPayTokenizerLoader: React.FC<Props> = ({
   onTokenReceived 
 }) => {
   useEffect(() => {
-    // 1. Define the callback FluidPay calls after it generates a token
+    // Defines the global callback required by FluidPay
     (window as any).fluidPayCallback = (response: any) => {
       if (response && response.token) {
-        console.log("[FluidPay] Token generated successfully:", response.token)
-        
-        // Notify the component via prop
-        if (onTokenReceived) onTokenReceived(response.token)
-        
-        // Notify the PaymentButton via Global Event
-        const event = new CustomEvent("fluidpay_token_received", { detail: response.token })
-        window.dispatchEvent(event)
-      } else {
-        console.error("[FluidPay] Tokenization failed:", response)
+        console.log("[FluidPay] Token generated:", response.token)
+        const event = new CustomEvent("fluidpay_token_received", { detail: response.token });
+        window.dispatchEvent(event);
+        if (onTokenReceived) onTokenReceived(response.token);
       }
-    }
+    };
 
-    // 2. Listener for the trigger from Review Step
+    // Global listener to trigger submission from the Review step
     const handleTriggerTokenize = () => {
-      console.log("[FluidPay] Triggering tokenizer submit...")
+      console.log("[FluidPay] Submit triggered via global event");
       if ((window as any).FluidPayTokenizer) {
-        (window as any).FluidPayTokenizer.submit()
-      } else {
-        console.error("[FluidPay] FluidPayTokenizer script not found on window")
+        (window as any).FluidPayTokenizer.submit();
       }
-    }
+    };
 
-    window.addEventListener("triggerFluidPayTokenize", handleTriggerTokenize)
-    return () => window.removeEventListener("triggerFluidPayTokenize", handleTriggerTokenize)
-  }, [onTokenReceived])
+    window.addEventListener("triggerFluidPayTokenize", handleTriggerTokenize);
+    return () => window.removeEventListener("triggerFluidPayTokenize", handleTriggerTokenize);
+  }, [onTokenReceived]);
+
+  // If srcBaseUrl is still undefined, we render nothing to prevent 404s
+  if (!srcBaseUrl || srcBaseUrl === "undefined") return null;
 
   return (
     <>
@@ -51,14 +46,14 @@ const FluidPayTokenizerLoader: React.FC<Props> = ({
         src={`${srcBaseUrl}/tokenizer/tokenizer.js`} 
         strategy="afterInteractive" 
       />
-      <div className="mt-4 p-4 border rounded-md bg-white min-h-[250px]">
-        {/* Container must be visible immediately so user can type */}
+      <div className="mt-4">
         <div 
           id="fluidpay-tokenizer-container" 
+          className="min-h-[200px] w-full border rounded-md p-4 bg-white"
           data-public-key={publicKey}
           data-callback="fluidPayCallback"
         >
-          {/* Iframe renders here */}
+          {/* FluidPay iframe renders here automatically after script loads */}
         </div>
       </div>
     </>
