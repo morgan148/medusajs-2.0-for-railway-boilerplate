@@ -8,6 +8,7 @@ import { CheckCircleSolid, CreditCard } from "@medusajs/icons"
 import { Button, Container, Heading, Text, Tooltip, clx } from "@medusajs/ui"
 import { CardElement } from "@stripe/react-stripe-js"
 import { StripeCardElementOptions } from "@stripe/stripe-js"
+import FluidPayTokenizerLoader from "@modules/checkout/components/fluidpay-tokenizer-loader"
 
 import Divider from "@modules/common/components/divider"
 import PaymentContainer from "@modules/checkout/components/payment-container"
@@ -33,6 +34,9 @@ const Payment = ({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(
     activeSession?.provider_id ?? ""
   )
+
+  // FluidPay
+  const fpBaseUrl = process.env.NEXT_PUBLIC_FLUIDPAY_BASE_URL || ""
 
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -164,6 +168,12 @@ const Payment = ({
                     )
                   })}
               </RadioGroup>
+
+              {/* Load FluidPay tokenizer script when "Manual Payment" is selected */}
+              {selectedPaymentMethod === "pp_system_default" && (
+                <FluidPayTokenizerLoader srcBaseUrl={fpBaseUrl} />
+              )}
+
               {isStripe && stripeReady && (
                 <div className="mt-5 transition-all duration-150 ease-in-out">
                   <Text className="txt-medium-plus text-ui-fg-base mb-1">
