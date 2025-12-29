@@ -30,6 +30,10 @@ export const paymentInfoMap: Record<
     title: "Manual Payment",
     icon: <CreditCard />,
   },
+  pp_fluidpay_fluidpay: {
+    title: "Credit card",
+    icon: <CreditCard />,
+  },
   // Add more payment providers here
 }
 
