@@ -1,7 +1,6 @@
 "use client"
 
 import { Heading, Text, clx } from "@medusajs/ui"
-
 import PaymentButton from "../payment-button"
 import { useSearchParams } from "next/navigation"
 
@@ -17,6 +16,25 @@ const Review = ({ cart }: { cart: any }) => {
     cart.shipping_address &&
     cart.shipping_methods.length > 0 &&
     (cart.payment_collection || paidByGiftcard)
+
+  /**
+   * ✅ NEW: Logic to determine if FluidPay is the selected provider
+   */
+  const activeSession = cart.payment_collection?.payment_sessions?.find(
+    (s: any) => s.status === "pending"
+  )
+  const isFluidPay = activeSession?.provider_id === "pp_fluidpay_fluidpay"
+
+  /**
+   * ✅ NEW: Trigger function for FluidPay tokenization
+   * This is passed down or used to intercept the final order placement.
+   */
+  const handleFluidPayTrigger = () => {
+    if (isFluidPay) {
+      console.log("[Review] Dispatching triggerFluidPayTokenize event...")
+      window.dispatchEvent(new Event("triggerFluidPayTokenize"))
+    }
+  }
 
   return (
     <div className="bg-white">
@@ -45,7 +63,14 @@ const Review = ({ cart }: { cart: any }) => {
               </Text>
             </div>
           </div>
-          <PaymentButton cart={cart} data-testid="submit-order-button" />
+          {/* Passing the trigger as a prop or handling it via the global 
+            event listener inside PaymentButton
+          */}
+          <PaymentButton 
+            cart={cart} 
+            data-testid="submit-order-button" 
+            onPaymentTrigger={handleFluidPayTrigger}
+          />
         </>
       )}
     </div>
