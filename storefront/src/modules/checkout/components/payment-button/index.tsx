@@ -83,22 +83,26 @@ const FluidPayPaymentButton = ({
     const handleTokenReceived = async (event: any) => {
       const token = event.detail
       try {
-        console.log("[PaymentButton] Received token, updating session...")
+        console.log("[PaymentButton] Received token, updating session with propagation...")
         
-        // Update session with token
+        // ✅ HARDENED: Passing the token in multiple standard paths to ensure backend visibility
         await initiatePaymentSession(cart, {
           provider_id: "pp_fluidpay_fluidpay",
-          data: { token }
+          data: { 
+            token: token,
+            metadata: { token: token },
+            fluidpay_token: token 
+          }
         })
 
-        // Wait briefly for DB consistency
-        await sleep(500)
+        // Give the Medusa DB an extra moment to settle the session update
+        await sleep(1000)
 
-        console.log("[PaymentButton] Completing order...")
+        console.log("[PaymentButton] Completing order placement...")
         await placeOrder()
       } catch (err: any) {
-        console.error("[PaymentButton] Error:", err)
-        setErrorMessage(err.message)
+        console.error("[PaymentButton] Error during checkout flow:", err)
+        setErrorMessage(err.message || "Payment authorization failed. Please try again.")
         setSubmitting(false)
       }
     }

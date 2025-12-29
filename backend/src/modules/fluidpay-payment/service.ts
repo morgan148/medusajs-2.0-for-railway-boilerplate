@@ -26,25 +26,32 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     }
   }
 
-  // Hardened for Medusa 2.0 to prevent "not authorized" errors
+  // Hardened for Medusa 2.0 to catch tokens across multiple data paths
   async authorizePayment(input: any): Promise<any> {
     const { paymentSessionData, context } = input
-    const token = paymentSessionData?.token
+    
+    // ✅ Check all possible paths for the token to fix 'Token Present: false'
+    const token = paymentSessionData?.token || 
+                  paymentSessionData?.metadata?.token || 
+                  paymentSessionData?.data?.token ||
+                  paymentSessionData?.fluidpay_token
+
     const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey
     const baseUrl = this.getApiUrl()
 
-    // EXTREME LOGGING: If you don't see this in Railway Deploy logs, the code isn't running
+    // EXTREME LOGGING: Now updated to show exactly where the token was found
     console.log("*****************************************")
     console.log("FLUIDPAY AUTHORIZE ATTEMPT STARTED")
-    console.log("Cart ID:", context?.cart_id)
-    console.log("Token Present:", !!token)
+    console.log("Cart ID:", context?.cart_id || paymentSessionData?.cart_id)
+    console.log("Token Found:", !!token)
+    if (token) console.log("Token Source verified.")
     console.log("*****************************************")
 
     if (!token) {
       return { 
         status: "error", 
         data: paymentSessionData || {}, 
-        error: "Missing FluidPay token" 
+        error: "Missing FluidPay token - Session data was empty." 
       }
     }
 
