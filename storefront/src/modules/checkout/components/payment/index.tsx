@@ -42,6 +42,9 @@ const Payment = ({
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(
     activeSession?.provider_id ?? ""
   )
+  
+  // ✅ NEW STATE: Capture the FluidPay token from the iframe
+  const [fpToken, setFpToken] = useState<string | null>(null)
 
   // FluidPay
   const fpBaseUrl = process.env.NEXT_PUBLIC_FLUIDPAY_BASE_URL || ""
@@ -52,7 +55,6 @@ const Payment = ({
 
   const isOpen = searchParams.get("step") === "payment"
 
-  // ✅ CHANGE #1: Stripe should be based on *selected* method, not any stale active session
   const isStripeSelected = isStripeFunc(selectedPaymentMethod)
   const stripeReady = useContext(StripeContext)
 
@@ -66,91 +68,31 @@ const Payment = ({
 
   /**
    * =========================
-   * DEBUG LOGGING (STEP 1)
+   * DEBUG LOGGING
    * =========================
    */
-
-  // Log the available payment methods whenever they change
   useEffect(() => {
-    if (!availablePaymentMethods?.length) {
-      console.log("[Payment] availablePaymentMethods: (empty/undefined)", {
-        availablePaymentMethods,
-      })
-      return
-    }
-
+    if (!availablePaymentMethods?.length) return
     console.log("[Payment] availablePaymentMethods:", availablePaymentMethods)
-
-    // Helpful condensed view
-    console.log(
-      "[Payment] availablePaymentMethods (ids/provider_id):",
-      availablePaymentMethods.map((m: any) => ({
-        id: m?.id,
-        provider_id: m?.provider_id,
-      }))
-    )
-
-    const hasFluidPay = availablePaymentMethods.some(
-      (m: any) => m?.id === FP_PROVIDER_ID
-    )
-    console.log(
-      "[Payment] hasFluidPay:",
-      hasFluidPay,
-      "FP_PROVIDER_ID:",
-      FP_PROVIDER_ID
-    )
   }, [availablePaymentMethods])
 
-  // Log key state snapshots when step/session/method changes
   useEffect(() => {
     console.log("[Payment] state snapshot:", {
-      step: searchParams.get("step"),
-      isOpen,
-      paidByGiftcard,
-      paymentReady,
-      cartId: cart?.id,
       selectedPaymentMethod,
-      activeSessionProviderId: activeSession?.provider_id,
-      activeSessionStatus: activeSession?.status,
-      isStripeSelected,
-      isStripeActiveSession: isStripeFunc(activeSession?.provider_id),
-      paymentSessions: cart?.payment_collection?.payment_sessions?.map((s: any) => ({
-        provider_id: s?.provider_id,
-        status: s?.status,
-      })),
+      fpTokenReceived: !!fpToken,
+      activeSessionProvider: activeSession?.provider_id,
     })
-  }, [
-    isOpen,
-    paidByGiftcard,
-    paymentReady,
-    selectedPaymentMethod,
-    activeSession?.provider_id,
-    activeSession?.status,
-    cart?.id,
-    cart?.payment_collection?.payment_sessions,
-    searchParams,
-    isStripeSelected,
-  ])
+  }, [selectedPaymentMethod, fpToken, activeSession])
 
   // Auto-select FluidPay when the Payment step is opened
   useEffect(() => {
-    if (!isOpen) return
-    if (paidByGiftcard) return
-
-    // If it's already FluidPay, do nothing.
+    if (!isOpen || paidByGiftcard) return
     if (selectedPaymentMethod === FP_PROVIDER_ID) return
 
-    // If there is an active session already (e.g., returning to payment step),
-    // we respect it unless it's empty.
-    // But since you want FluidPay default, we’ll set it whenever it’s blank or manual.
     const shouldForceFluidPay =
       !selectedPaymentMethod || selectedPaymentMethod === "pp_system_default"
 
     if (shouldForceFluidPay) {
-      console.log("[Payment] Forcing selectedPaymentMethod to FluidPay", {
-        from: selectedPaymentMethod,
-        to: FP_PROVIDER_ID,
-      })
       setSelectedPaymentMethod(FP_PROVIDER_ID)
     }
   }, [isOpen, paidByGiftcard, selectedPaymentMethod])
@@ -161,9 +103,7 @@ const Payment = ({
         base: {
           fontFamily: "Inter, sans-serif",
           color: "#424270",
-          "::placeholder": {
-            color: "rgb(107 114 128)",
-          },
+          "::placeholder": { color: "rgb(107 114 128)" },
         },
       },
       classes: {
@@ -192,54 +132,25 @@ const Payment = ({
     try {
       const shouldInputCard = isStripeSelected && !activeSession
 
-      console.log("[Payment] handleSubmit clicked", {
-        cartId: cart?.id,
-        selectedPaymentMethod,
-        shouldInputCard,
-        hasActiveSession: !!activeSession,
-        activeSessionProviderId: activeSession?.provider_id,
-        activeSessionStatus: activeSession?.status,
-      })
-
-      if (!activeSession) {
-        console.log("[Payment] Submitting payment session", {
-          cartId: cart?.id,
-          provider_id: selectedPaymentMethod,
-          existingPaymentSessions:
-            cart?.payment_collection?.payment_sessions?.map((s: any) => ({
-              provider_id: s?.provider_id,
-              status: s?.status,
-            })),
-        })
-
+      // ✅ UPDATED LOGIC: Pass FluidPay token data if it exists
+      if (!activeSession || (isFluidPay && fpToken)) {
         await initiatePaymentSession(cart, {
           provider_id: selectedPaymentMethod,
+          // Pass the token in the data object for the backend to consume
+          data: isFluidPay && fpToken ? { token: fpToken } : {},
         })
 
-        console.log("[Payment] initiatePaymentSession completed")
-
-        // ✅ CHANGE #2: force a cart refresh *before* routing to review so the Review step
-        // sees the new pending session and doesn’t show “Select a payment method”
-        console.log("[Payment] router.refresh() after initiatePaymentSession")
         router.refresh()
         await sleep(250)
-      } else {
-        console.log(
-          "[Payment] Skipping initiatePaymentSession because activeSession exists"
-        )
       }
 
       if (!shouldInputCard) {
-        console.log("[Payment] Routing to review step")
         return router.push(
           pathname + "?" + createQueryString("step", "review"),
-          {
-            scroll: false,
-          }
+          { scroll: false }
         )
       }
     } catch (err: any) {
-      console.error("[Payment] handleSubmit error:", err)
       setError(err.message)
     } finally {
       setIsLoading(false)
@@ -257,10 +168,7 @@ const Payment = ({
           level="h2"
           className={clx(
             "flex flex-row text-3xl-regular gap-x-2 items-baseline",
-            {
-              "opacity-50 pointer-events-none select-none":
-                !isOpen && !paymentReady,
-            }
+            { "opacity-50 pointer-events-none select-none": !isOpen && !paymentReady }
           )}
         >
           Payment
@@ -283,52 +191,46 @@ const Payment = ({
         <div className={isOpen ? "block" : "hidden"}>
           {!paidByGiftcard && availablePaymentMethods?.length ? (
             <>
-              {/* Payment method chooser (optional) */}
               {SHOW_PAYMENT_METHOD_CHOOSER && (
                 <RadioGroup
                   value={selectedPaymentMethod}
                   onChange={(value: string) => setSelectedPaymentMethod(value)}
                 >
                   {availablePaymentMethods
-                    .sort((a, b) => {
-                      return a.provider_id > b.provider_id ? 1 : -1
-                    })
-                    .map((paymentMethod) => {
-                      return (
-                        <PaymentContainer
-                          paymentInfoMap={paymentInfoMap}
-                          paymentProviderId={paymentMethod.id}
-                          key={paymentMethod.id}
-                          selectedPaymentOptionId={selectedPaymentMethod}
-                        />
-                      )
-                    })}
+                    .sort((a, b) => (a.provider_id > b.provider_id ? 1 : -1))
+                    .map((paymentMethod) => (
+                      <PaymentContainer
+                        paymentInfoMap={paymentInfoMap}
+                        paymentProviderId={paymentMethod.id}
+                        key={paymentMethod.id}
+                        selectedPaymentOptionId={selectedPaymentMethod}
+                      />
+                    ))}
                 </RadioGroup>
               )}
 
-              {/* FluidPay tokenizer (default path) */}
+              {/* ✅ UPDATED: Added onTokenReceived callback to capture the iframe token */}
               {isFluidPay && (
                 <FluidPayTokenizerLoader
                   srcBaseUrl={fpBaseUrl}
                   cartId={cart?.id || ""}
                   publicKey={process.env.NEXT_PUBLIC_FLUIDPAY_PUBLIC_KEY || ""}
+                  onTokenReceived={(token) => {
+                    console.log("[Payment] Received token from iframe:", token)
+                    setFpToken(token)
+                  }}
                 />
               )}
 
-              {/* Stripe card element (only if Stripe is selected) */}
               {isStripeSelected && stripeReady && (
                 <div className="mt-5 transition-all duration-150 ease-in-out">
                   <Text className="txt-medium-plus text-ui-fg-base mb-1">
                     Enter your card details:
                   </Text>
-
                   <CardElement
                     options={useOptions as StripeCardElementOptions}
                     onChange={(e) => {
-                      setCardBrand(
-                        e.brand &&
-                          e.brand.charAt(0).toUpperCase() + e.brand.slice(1)
-                      )
+                      setCardBrand(e.brand && e.brand.charAt(0).toUpperCase() + e.brand.slice(1))
                       setError(e.error?.message || null)
                       setCardComplete(e.complete)
                     }}
@@ -338,38 +240,25 @@ const Payment = ({
             </>
           ) : null}
 
-          {paidByGiftcard && (
-            <div className="flex flex-col w-1/3">
-              <Text className="txt-medium-plus text-ui-fg-base mb-1">
-                Payment method
-              </Text>
-              <Text
-                className="txt-medium text-ui-fg-subtle"
-                data-testid="payment-method-summary"
-              >
-                Gift card
-              </Text>
-            </div>
-          )}
-
-          <ErrorMessage
-            error={error}
-            data-testid="payment-method-error-message"
-          />
+          <ErrorMessage error={error} data-testid="payment-method-error-message" />
 
           <Button
             size="large"
             className="mt-6"
             onClick={handleSubmit}
             isLoading={isLoading}
+            // ✅ UPDATED: Disabled if FluidPay is active but no token has been received yet
             disabled={
+              (isFluidPay && !fpToken) ||
               (isStripeSelected && !cardComplete) ||
               (!selectedPaymentMethod && !paidByGiftcard)
             }
             data-testid="submit-payment-button"
           >
-            {!activeSession && isStripeSelected
-              ? " Enter card details"
+            {isFluidPay && !fpToken
+              ? "Waiting for payment details..."
+              : !activeSession && isStripeSelected
+              ? "Enter card details"
               : "Continue to review"}
           </Button>
         </div>
@@ -378,52 +267,29 @@ const Payment = ({
           {cart && paymentReady && activeSession ? (
             <div className="flex items-start gap-x-1 w-full">
               <div className="flex flex-col w-1/3">
-                <Text className="txt-medium-plus text-ui-fg-base mb-1">
-                  Payment method
-                </Text>
-                <Text
-                  className="txt-medium text-ui-fg-subtle"
-                  data-testid="payment-method-summary"
-                >
-                  {paymentInfoMap[selectedPaymentMethod]?.title ||
-                    selectedPaymentMethod}
+                <Text className="txt-medium-plus text-ui-fg-base mb-1">Payment method</Text>
+                <Text className="txt-medium text-ui-fg-subtle" data-testid="payment-method-summary">
+                  {paymentInfoMap[selectedPaymentMethod]?.title || selectedPaymentMethod}
                 </Text>
               </div>
               <div className="flex flex-col w-1/3">
-                <Text className="txt-medium-plus text-ui-fg-base mb-1">
-                  Payment details
-                </Text>
-                <div
-                  className="flex gap-2 txt-medium text-ui-fg-subtle items-center"
-                  data-testid="payment-details-summary"
-                >
+                <Text className="txt-medium-plus text-ui-fg-base mb-1">Payment details</Text>
+                <div className="flex gap-2 txt-medium text-ui-fg-subtle items-center" data-testid="payment-details-summary">
                   <Container className="flex items-center h-7 w-fit p-2 bg-ui-button-neutral-hover">
-                    {paymentInfoMap[selectedPaymentMethod]?.icon || (
-                      <CreditCard />
-                    )}
+                    {paymentInfoMap[selectedPaymentMethod]?.icon || <CreditCard />}
                   </Container>
-                  <Text>
-                    {isStripeSelected && cardBrand ? cardBrand : "Another step will appear"}
-                  </Text>
+                  <Text>{isStripeSelected && cardBrand ? cardBrand : "Card details saved"}</Text>
                 </div>
               </div>
             </div>
           ) : paidByGiftcard ? (
             <div className="flex flex-col w-1/3">
-              <Text className="txt-medium-plus text-ui-fg-base mb-1">
-                Payment method
-              </Text>
-              <Text
-                className="txt-medium text-ui-fg-subtle"
-                data-testid="payment-method-summary"
-              >
-                Gift card
-              </Text>
+              <Text className="txt-medium-plus text-ui-fg-base mb-1">Payment method</Text>
+              <Text className="txt-medium text-ui-fg-subtle">Gift card</Text>
             </div>
           ) : null}
         </div>
       </div>
-
       <Divider className="mt-8" />
     </div>
   )
