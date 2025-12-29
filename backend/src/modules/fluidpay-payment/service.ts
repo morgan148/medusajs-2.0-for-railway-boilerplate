@@ -1,72 +1,60 @@
-import PaymentProviderService from "@medusajs/medusa/dist/services/payment-provider"
+import { PaymentProvider } from "@medusajs/framework/types"
 
 type FluidPayOptions = {
   baseUrl?: string
   secretKey: string
 }
 
-export default class FluidPayPaymentProviderService
-  extends PaymentProviderService {
+const FluidPayProvider: PaymentProvider<FluidPayOptions> = {
+  identifier: "fluidpay",
 
-  static identifier = "fluidpay"
-
-  protected options_: FluidPayOptions
-
-  constructor(container, options: FluidPayOptions) {
-    super(container)
-    this.options_ = options
-  }
-
-  /**
-   * AUTHORIZE + CAPTURE (IMMEDIATE)
-   */
-  async authorizePayment(input: any): Promise<any> {
-    const session = input.paymentSession
-
-    const amount = session.amount
-    const currency = session.currency_code
-    const token = session.data?.token
+  async authorizePayment({ paymentSession }) {
+    const token = paymentSession.data?.token
 
     if (!token) {
       throw new Error("FluidPay token missing from payment session")
     }
 
-    // TODO: Replace with real FluidPay API call
+    // TODO: Call FluidPay Tokenizer Customer Payment API here
+    // https://sandbox.fluidpay.com/docs/workflows/tokenizer-customer-payment
+
     const transactionId = `fp_${Date.now()}`
 
     return {
       status: "captured",
       data: {
         transaction_id: transactionId,
-        amount,
-        currency,
+        amount: paymentSession.amount,
+        currency_code: paymentSession.currency_code,
       },
     }
-  }
+  },
 
-  async capturePayment(): Promise<any> {
+  async capturePayment() {
     return { data: {} }
-  }
+  },
 
-  async cancelPayment(input: any): Promise<any> {
-    return { data: input.payment?.data }
-  }
+  async cancelPayment({ payment }) {
+    return { data: payment.data }
+  },
 
-  async refundPayment(input: any): Promise<any> {
+  async refundPayment({ amount, payment }) {
     return {
       data: {
-        refunded_amount: input.amount,
-        transaction_id: input.payment?.data?.transaction_id,
+        refunded_amount: amount,
+        transaction_id: payment.data?.transaction_id,
       },
     }
-  }
+  },
 
-  async updatePayment(input: any): Promise<any> {
+  async updatePayment({ payment, data }) {
     return {
       data: {
-        ...input.payment?.data,
-        ...input.data,
+        ...payment.data,
+        ...data,
       },
     }
-  }
+  },
 }
+
+export default FluidPayProvider
