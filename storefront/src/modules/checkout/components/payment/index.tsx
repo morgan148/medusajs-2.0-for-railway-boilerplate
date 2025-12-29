@@ -1,10 +1,5 @@
 "use client"
 
-console.log("FP ENV", {
-  baseUrl: process.env.NEXT_PUBLIC_FLUIDPAY_BASE_URL,
-  pubKeyPresent: !!process.env.NEXT_PUBLIC_FLUIDPAY_PUBLIC_KEY,
-})
-
 import { useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { RadioGroup } from "@headlessui/react"
