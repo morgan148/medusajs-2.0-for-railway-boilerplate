@@ -1,4 +1,4 @@
-import { PaymentProviderService } from "@medusajs/medusa"
+import PaymentProviderService from "@medusajs/medusa/dist/services/payment-provider"
 
 type FluidPayOptions = {
   baseUrl?: string
