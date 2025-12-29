@@ -26,19 +26,19 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     }
   }
 
-  // Logic updated to ensure 'status' is always returned to satisfy Medusa
+  // Updated to ensure Medusa receives 'status' and 'data' on every exit
   async authorizePayment(input: any): Promise<any> {
     const { paymentSessionData, context } = input
     const token = paymentSessionData?.token
     const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey
     const baseUrl = this.getApiUrl()
 
+    // 1. Return 'error' status and non-undefined 'data' if token is missing
     if (!token) {
-      // ✅ Status "error" prevents the "non-undefined" backend crash
       return { 
         status: "error", 
-        error: "Missing FluidPay token", 
-        code: "missing_token" 
+        data: paymentSessionData || {}, 
+        error: "Missing FluidPay token" 
       }
     }
 
@@ -52,37 +52,39 @@ class FluidPayProviderService extends AbstractPaymentProvider {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          type: "sale", // Immediate capture
+          type: "sale", 
           amount: amountCents,
           currency: (context?.currency_code || "USD").toUpperCase(),
           payment_method: { token },
-          vault_payment_method: true, // Support vaulting
+          vault_payment_method: true, 
         }),
       })
 
       const result = await res.json()
       
+      // 2. Return 'error' status and non-undefined 'data' on API failure
       if (!res.ok) {
-        // ✅ Explicitly return "error" status
         return { 
           status: "error", 
-          error: result?.message || "FluidPay transaction failed",
-          data: result 
+          data: result || {}, 
+          error: result?.message || "FluidPay transaction failed"
         }
       }
 
-      // ✅ SUCCESS: Status "captured" indicates funds are settled
+      // 3. Return 'captured' status and payload on success
       return {
         status: "captured",
         data: {
+          ...paymentSessionData,
           fluidpay_id: result.data?.id,
           fluidpay_vault_id: result.data?.payment_method?.token,
         },
       }
     } catch (e: any) {
-      // ✅ Global error catch returns "error" status
+      // 4. Global catch must also return valid status and data
       return { 
         status: "error", 
+        data: paymentSessionData || {}, 
         error: e.message 
       }
     }
