@@ -1,3 +1,8 @@
-import FluidPayPaymentProviderService from "./service"
+import FluidPayProviderService from "./service"
+import { ModuleProviderDefinition } from "@medusajs/framework/types"
 
-export default FluidPayPaymentProviderService
+const providerDefinition: ModuleProviderDefinition = {
+  services: [FluidPayProviderService],
+}
+
+export default providerDefinition
