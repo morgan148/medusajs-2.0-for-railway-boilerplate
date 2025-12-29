@@ -1,123 +1,117 @@
+import AbstractPaymentProvider from "@medusajs/payment"
+
 import {
-    AbstractPaymentProvider,
-  } from "@medusajs/payment"
-  
-  import {
-    AuthorizePaymentInput,
-    AuthorizePaymentOutput,
-    CapturePaymentInput,
-    CapturePaymentOutput,
-    RefundPaymentInput,
-    RefundPaymentOutput,
-    UpdatePaymentInput,
-    UpdatePaymentOutput,
-    CancelPaymentInput,
-    CancelPaymentOutput,
-    GetWebhookActionAndDataInput,
-    WebhookActionResult,
-  } from "@medusajs/types"
-  
-  type FluidPayOptions = {
-    baseUrl?: string
-    secretKey: string
+  PaymentProviderAuthorizePaymentInput,
+  PaymentProviderAuthorizePaymentOutput,
+  PaymentProviderCapturePaymentInput,
+  PaymentProviderCapturePaymentOutput,
+  PaymentProviderRefundPaymentInput,
+  PaymentProviderRefundPaymentOutput,
+  PaymentProviderCancelPaymentInput,
+  PaymentProviderCancelPaymentOutput,
+  PaymentProviderUpdatePaymentInput,
+  PaymentProviderUpdatePaymentOutput,
+} from "@medusajs/types"
+
+type FluidPayOptions = {
+  baseUrl?: string
+  secretKey: string
+}
+
+export default class FluidPayPaymentProviderService
+  extends AbstractPaymentProvider<Record<string, unknown>> {
+
+  static identifier = "fluidpay"
+
+  protected options_: FluidPayOptions
+
+  constructor(container, options: FluidPayOptions) {
+    super(container, options)
+    this.options_ = options
   }
-  
-  export default class FluidPayPaymentProviderService
-    extends AbstractPaymentProvider<Record<string, unknown>> {
-  
-    static identifier = "fluidpay"
-  
-    protected options_: FluidPayOptions
-  
-    constructor(container, options: FluidPayOptions) {
-      super(container, options)
-      this.options_ = options
+
+  /**
+   * AUTHORIZE + CAPTURE IMMEDIATELY
+   */
+  async authorizePayment(
+    input: PaymentProviderAuthorizePaymentInput
+  ): Promise<PaymentProviderAuthorizePaymentOutput> {
+
+    const session = input.paymentSession
+    const amount = session.amount
+    const currency = session.currency_code
+
+    const token = session.data?.token
+
+    if (!token) {
+      throw new Error("FluidPay token missing from payment session")
     }
-  
+
     /**
-     * AUTHORIZE + CAPTURE (IMMEDIATE)
+     * TODO:
+     * Call FluidPay Tokenizer Customer Payment API
+     * https://sandbox.fluidpay.com/docs/workflows/tokenizer-customer-payment
      */
-    async authorizePayment(
-      input: AuthorizePaymentInput
-    ): Promise<AuthorizePaymentOutput> {
-      const { amount, currency_code, payment_session } = input
-  
-      // token was created client-side by tokenizer
-      const token = payment_session.data?.token
-  
-      if (!token) {
-        throw new Error("FluidPay token missing from payment session")
-      }
-  
-      /**
-       * TODO:
-       * Call FluidPay Tokenizer Customer Payment API here
-       * https://sandbox.fluidpay.com/docs/workflows/tokenizer-customer-payment
-       */
-  
-      // Simulated success response
-      const transactionId = `fp_${Date.now()}`
-  
-      return {
-        status: "captured", // 👈 authorize + capture immediately
-        data: {
-          transaction_id: transactionId,
-          amount,
-          currency_code,
-        },
-      }
-    }
-  
-    async capturePayment(
-      input: CapturePaymentInput
-    ): Promise<CapturePaymentOutput> {
-      // No-op because we already captured
-      return {
-        data: input.payment.data,
-      }
-    }
-  
-    async cancelPayment(
-      input: CancelPaymentInput
-    ): Promise<CancelPaymentOutput> {
-      return {
-        data: input.payment.data,
-      }
-    }
-  
-    async refundPayment(
-      input: RefundPaymentInput
-    ): Promise<RefundPaymentOutput> {
-      const { amount, payment } = input
-  
-      /**
-       * TODO:
-       * Call FluidPay refund endpoint
-       */
-  
-      return {
-        data: {
-          refunded_amount: amount,
-          transaction_id: payment.data?.transaction_id,
-        },
-      }
-    }
-  
-    async updatePayment(
-      input: UpdatePaymentInput
-    ): Promise<UpdatePaymentOutput> {
-      return {
-        data: {
-          ...input.payment.data,
-          ...input.data,
-        },
-      }
-    }
-  
-    async getWebhookActionAndData(
-      _input: GetWebhookActionAndDataInput
-    ): Promise<WebhookActionResult | null> {
-      // Not using webhooks yet
-      return null
+
+    // TEMP simulated transaction
+    const transactionId = `fp_${Date.now()}`
+
+    return {
+      status: "captured", // 👈 immediate charge
+      data: {
+        transaction_id: transactionId,
+        amount,
+        currency,
+      },
     }
   }
+
+  /**
+   * No-op (already captured)
+   */
+  async capturePayment(
+    _input: PaymentProviderCapturePaymentInput
+  ): Promise<PaymentProviderCapturePaymentOutput> {
+    return {
+      data: {},
+    }
+  }
+
+  async cancelPayment(
+    input: PaymentProviderCancelPaymentInput
+  ): Promise<PaymentProviderCancelPaymentOutput> {
+    return {
+      data: input.payment.data,
+    }
+  }
+
+  async refundPayment(
+    input: PaymentProviderRefundPaymentInput
+  ): Promise<PaymentProviderRefundPaymentOutput> {
+
+    const { payment, amount } = input
+
+    /**
+     * TODO:
+     * Call FluidPay refund endpoint
+     */
+
+    return {
+      data: {
+        refunded_amount: amount,
+        transaction_id: payment.data?.transaction_id,
+      },
+    }
+  }
+
+  async updatePayment(
+    input: PaymentProviderUpdatePaymentInput
+  ): Promise<PaymentProviderUpdatePaymentOutput> {
+    return {
+      data: {
+        ...input.payment.data,
+        ...input.data,
+      },
+    }
+  }
+}
