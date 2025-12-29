@@ -1,10 +1,5 @@
 import { AbstractPaymentProvider } from "@medusajs/framework/utils"
 
-type FluidPayOptions = {
-  baseUrl?: string
-  secretKey: string
-}
-
 class FluidPayProviderService extends AbstractPaymentProvider {
   static identifier = "fluidpay"
 
@@ -12,7 +7,6 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     return process.env.FLUIDPAY_API_URL || "https://sandbox.fluidpay.com/api"
   }
 
-  // Required by Medusa v2 to handle webhooks
   async getWebhookActionAndData(data: any): Promise<any> {
     return { action: "not_supported", data: {} }
   }
@@ -26,39 +20,41 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     }
   }
 
+  // Refined to catch data regardless of the Medusa version structure
   async authorizePayment(input: any): Promise<any> {
-    const { paymentSessionData, context } = input
-    
-    // ✅ DEBUG: Log the entire session object to find the missing token
+    // 1. INSPECT THE ENTIRE INPUT OBJECT
     console.log("*****************************************")
-    console.log("FULL SESSION DATA INSPECTION:", JSON.stringify(paymentSessionData, null, 2))
+    console.log("CRITICAL INPUT INSPECTION:", JSON.stringify(input, null, 2))
     
-    // Look in every possible nested location
-    const token = paymentSessionData?.token || 
-                  paymentSessionData?.data?.token || 
-                  paymentSessionData?.metadata?.token ||
-                  paymentSessionData?.fluidpay_token ||
-                  (paymentSessionData?.data as any)?.fluidpay_token
+    // Some versions pass (sessionData, context), others pass { paymentSessionData, context }
+    const sessionData = input?.paymentSessionData || input || {}
+    const context = input?.context || {}
+
+    // 2. SEARCH EVERYWHERE FOR THE TOKEN
+    const token = sessionData?.token || 
+                  sessionData?.data?.token || 
+                  sessionData?.metadata?.token ||
+                  sessionData?.fluidpay_token ||
+                  (sessionData as any)?.data?.fluidpay_token
 
     const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey
     const baseUrl = this.getApiUrl()
 
-    console.log("FLUIDPAY AUTHORIZE ATTEMPT")
-    console.log("Cart ID:", context?.cart_id || paymentSessionData?.cart_id)
-    console.log("Token Found:", !!token)
+    console.log("Cart ID:", context?.cart_id || sessionData?.cart_id)
+    console.log("Token Extracted:", !!token)
     console.log("*****************************************")
 
     if (!token) {
+      // Return status error to stop the order, but provide data to avoid crash
       return { 
         status: "error", 
-        data: paymentSessionData || {}, 
-        error: "Missing FluidPay token - check backend logs for FULL SESSION DATA INSPECTION" 
+        data: sessionData || {}, 
+        error: "Missing FluidPay token. Check 'CRITICAL INPUT INSPECTION' in logs." 
       }
     }
 
-    const amountCents = Math.round(context?.amount || paymentSessionData?.amount || 0)
-
     try {
+      const amountCents = Math.round(context?.amount || sessionData?.amount || 0)
       const res = await fetch(`${baseUrl}/transaction`, {
         method: "POST",
         headers: {
@@ -75,7 +71,7 @@ class FluidPayProviderService extends AbstractPaymentProvider {
       })
 
       const result = await res.json()
-      console.log("[FluidPay API Success Response]:", JSON.stringify(result, null, 2))
+      console.log("[FluidPay API Response]:", JSON.stringify(result, null, 2))
       
       if (!res.ok) {
         return { 
@@ -85,21 +81,18 @@ class FluidPayProviderService extends AbstractPaymentProvider {
         }
       }
 
+      // Format response exactly as Medusa 2.0 expects
       return {
         status: "captured",
         data: {
-          ...paymentSessionData,
+          ...sessionData,
           fluidpay_id: result.data?.id,
           fluidpay_vault_id: result.data?.payment_method?.token,
         },
       }
-
     } catch (e: any) {
-      return { 
-        status: "error", 
-        data: paymentSessionData || {}, 
-        error: e.message 
-      }
+      console.error("[FluidPay Global Catch]:", e.message)
+      return { status: "error", data: sessionData || {}, error: e.message }
     }
   }
 
