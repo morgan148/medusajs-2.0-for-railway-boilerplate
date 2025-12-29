@@ -1,15 +1,15 @@
-import { PaymentProvider } from "@medusajs/framework/types"
+import type { IPaymentProvider } from "@medusajs/framework/types"
 
 type FluidPayOptions = {
   baseUrl?: string
   secretKey: string
 }
 
-const FluidPayProvider: PaymentProvider<FluidPayOptions> = {
+const FluidPayProvider: IPaymentProvider<FluidPayOptions> = {
   identifier: "fluidpay",
 
   async authorizePayment({ paymentSession }) {
-    const token = paymentSession.data?.token
+    const token = (paymentSession?.data as any)?.token
 
     if (!token) {
       throw new Error("FluidPay token missing from payment session")
