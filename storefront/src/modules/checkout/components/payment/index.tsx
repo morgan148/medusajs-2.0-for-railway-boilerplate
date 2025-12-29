@@ -61,6 +61,68 @@ const Payment = ({
 
   const isFluidPay = selectedPaymentMethod === FP_PROVIDER_ID
 
+  /**
+   * =========================
+   * DEBUG LOGGING (STEP 1)
+   * =========================
+   */
+
+  // Log the available payment methods whenever they change
+  useEffect(() => {
+    if (!availablePaymentMethods?.length) {
+      console.log("[Payment] availablePaymentMethods: (empty/undefined)", {
+        availablePaymentMethods,
+      })
+      return
+    }
+
+    console.log("[Payment] availablePaymentMethods:", availablePaymentMethods)
+
+    // Helpful condensed view
+    console.log(
+      "[Payment] availablePaymentMethods (ids/provider_id):",
+      availablePaymentMethods.map((m: any) => ({
+        id: m?.id,
+        provider_id: m?.provider_id,
+      }))
+    )
+
+    const hasFluidPay = availablePaymentMethods.some(
+      (m: any) => m?.id === FP_PROVIDER_ID
+    )
+    console.log("[Payment] hasFluidPay:", hasFluidPay, "FP_PROVIDER_ID:", FP_PROVIDER_ID)
+  }, [availablePaymentMethods])
+
+  // Log key state snapshots when step/session/method changes
+  useEffect(() => {
+    console.log("[Payment] state snapshot:", {
+      step: searchParams.get("step"),
+      isOpen,
+      paidByGiftcard,
+      paymentReady,
+      cartId: cart?.id,
+      selectedPaymentMethod,
+      activeSessionProviderId: activeSession?.provider_id,
+      activeSessionStatus: activeSession?.status,
+      isStripeSelected: isStripeFunc(selectedPaymentMethod),
+      isStripeActiveSession: isStripeFunc(activeSession?.provider_id),
+      paymentSessions: cart?.payment_collection?.payment_sessions?.map((s: any) => ({
+        provider_id: s?.provider_id,
+        status: s?.status,
+      })),
+    })
+  }, [
+    isOpen,
+    paidByGiftcard,
+    paymentReady,
+    selectedPaymentMethod,
+    activeSession?.provider_id,
+    activeSession?.status,
+    cart?.id,
+    cart?.payment_collection?.payment_sessions,
+    searchParams,
+  ])
+
   // Auto-select FluidPay when the Payment step is opened
   useEffect(() => {
     if (!isOpen) return
@@ -76,6 +138,10 @@ const Payment = ({
       !selectedPaymentMethod || selectedPaymentMethod === "pp_system_default"
 
     if (shouldForceFluidPay) {
+      console.log("[Payment] Forcing selectedPaymentMethod to FluidPay", {
+        from: selectedPaymentMethod,
+        to: FP_PROVIDER_ID,
+      })
       setSelectedPaymentMethod(FP_PROVIDER_ID)
     }
   }, [isOpen, paidByGiftcard, selectedPaymentMethod])
@@ -118,20 +184,37 @@ const Payment = ({
       const shouldInputCard =
         isStripeFunc(selectedPaymentMethod) && !activeSession
 
-        if (!activeSession) {
-          console.log("Submitting payment session", {
-            cartId: cart?.id,
-            selectedPaymentMethod,
-            hasActiveSession: !!activeSession,
-            paymentSessions: cart?.payment_collection?.payment_sessions,
-          })
-        
-          await initiatePaymentSession(cart, {
-            provider_id: selectedPaymentMethod,
-          })
-        }
+      console.log("[Payment] handleSubmit clicked", {
+        cartId: cart?.id,
+        selectedPaymentMethod,
+        shouldInputCard,
+        hasActiveSession: !!activeSession,
+        activeSessionProviderId: activeSession?.provider_id,
+        activeSessionStatus: activeSession?.status,
+      })
+
+      if (!activeSession) {
+        console.log("[Payment] Submitting payment session", {
+          cartId: cart?.id,
+          provider_id: selectedPaymentMethod,
+          existingPaymentSessions:
+            cart?.payment_collection?.payment_sessions?.map((s: any) => ({
+              provider_id: s?.provider_id,
+              status: s?.status,
+            })),
+        })
+
+        await initiatePaymentSession(cart, {
+          provider_id: selectedPaymentMethod,
+        })
+
+        console.log("[Payment] initiatePaymentSession completed")
+      } else {
+        console.log("[Payment] Skipping initiatePaymentSession because activeSession exists")
+      }
 
       if (!shouldInputCard) {
+        console.log("[Payment] Routing to review step")
         return router.push(
           pathname + "?" + createQueryString("step", "review"),
           {
@@ -140,6 +223,7 @@ const Payment = ({
         )
       }
     } catch (err: any) {
+      console.error("[Payment] handleSubmit error:", err)
       setError(err.message)
     } finally {
       setIsLoading(false)
@@ -209,11 +293,11 @@ const Payment = ({
               {/* FluidPay tokenizer (default path) */}
               {isFluidPay && (
                 <FluidPayTokenizerLoader
-    srcBaseUrl={fpBaseUrl}
-    cartId={cart?.id || "" || ""}
-    publicKey={process.env.NEXT_PUBLIC_FLUIDPAY_PUBLIC_KEY || ""}
-  />
-)}
+                  srcBaseUrl={fpBaseUrl}
+                  cartId={cart?.id || ""}
+                  publicKey={process.env.NEXT_PUBLIC_FLUIDPAY_PUBLIC_KEY || ""}
+                />
+              )}
 
               {/* Stripe card element (only if Stripe is selected) */}
               {isStripe && stripeReady && (
