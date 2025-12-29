@@ -20,41 +20,49 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     }
   }
 
-  // Refined to catch data regardless of the Medusa version structure
   async authorizePayment(input: any): Promise<any> {
-    // 1. INSPECT THE ENTIRE INPUT OBJECT
+    // 1. INSPECT THE INPUT
     console.log("*****************************************")
     console.log("CRITICAL INPUT INSPECTION:", JSON.stringify(input, null, 2))
     
-    // Some versions pass (sessionData, context), others pass { paymentSessionData, context }
     const sessionData = input?.paymentSessionData || input || {}
     const context = input?.context || {}
 
-    // 2. SEARCH EVERYWHERE FOR THE TOKEN
+    // 2. SEARCH FOR TOKEN
     const token = sessionData?.token || 
                   sessionData?.data?.token || 
                   sessionData?.metadata?.token ||
-                  sessionData?.fluidpay_token ||
-                  (sessionData as any)?.data?.fluidpay_token
+                  sessionData?.fluidpay_token
+
+    // 3. FIX: PULL AMOUNT FROM SESSION DATA IF CONTEXT IS EMPTY
+    const rawAmount = context?.amount || sessionData?.amount || sessionData?.data?.amount || 0
+    const amountCents = Math.round(Number(rawAmount))
 
     const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey
     const baseUrl = this.getApiUrl()
 
-    console.log("Cart ID:", context?.cart_id || sessionData?.cart_id)
     console.log("Token Extracted:", !!token)
+    console.log("Amount in Cents:", amountCents)
     console.log("*****************************************")
 
-    if (!token) {
-      // Return status error to stop the order, but provide data to avoid crash
+    // Early exit if amount is 0 to avoid FluidPay 400 error
+    if (amountCents <= 0) {
       return { 
         status: "error", 
         data: sessionData || {}, 
-        error: "Missing FluidPay token. Check 'CRITICAL INPUT INSPECTION' in logs." 
+        error: `Invalid amount: ${amountCents}. Medusa did not provide a total.` 
+      }
+    }
+
+    if (!token) {
+      return { 
+        status: "error", 
+        data: sessionData || {}, 
+        error: "Missing FluidPay token." 
       }
     }
 
     try {
-      const amountCents = Math.round(context?.amount || sessionData?.amount || 0)
       const res = await fetch(`${baseUrl}/transaction`, {
         method: "POST",
         headers: {
@@ -64,7 +72,7 @@ class FluidPayProviderService extends AbstractPaymentProvider {
         body: JSON.stringify({
           type: "sale", 
           amount: amountCents,
-          currency: (context?.currency_code || "USD").toUpperCase(),
+          currency: (context?.currency_code || sessionData?.currency_code || "USD").toUpperCase(),
           payment_method: { token },
           vault_payment_method: true, 
         }),
@@ -81,7 +89,6 @@ class FluidPayProviderService extends AbstractPaymentProvider {
         }
       }
 
-      // Format response exactly as Medusa 2.0 expects
       return {
         status: "captured",
         data: {
