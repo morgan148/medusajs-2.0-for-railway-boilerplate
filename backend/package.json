@@ -38,7 +38,7 @@
     "resend": "4.0.1",
     "ulid": "^2.4.0",
     "@medusajs/payment": "2.12.1",
-    "@medusajs/types": "2.12.1",
+    "@medusajs/types": "2.12.1"
   },
   "devDependencies": {
     "@medusajs/test-utils": "2.12.1",
