@@ -26,15 +26,14 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     }
   }
 
-  // Updated to ensure Medusa receives 'status' and 'data' on every exit
+  // Hardened authorizePayment to satisfy Medusa's entity requirements
   async authorizePayment(input: any): Promise<any> {
     const { paymentSessionData, context } = input
     const token = paymentSessionData?.token
-    // Use the variable name you have in Railway
     const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey
     const baseUrl = this.getApiUrl()
 
-    // 1. Return 'error' status and non-undefined 'data' if token is missing
+    // 1. Return 'error' status and required 'data' object if token is missing
     if (!token) {
       return { 
         status: "error", 
@@ -63,7 +62,10 @@ class FluidPayProviderService extends AbstractPaymentProvider {
 
       const result = await res.json()
       
-      // 2. Return 'error' status and non-undefined 'data' on API failure
+      // ✅ Log exact API response for debugging in Railway logs
+      console.log("[FluidPay API Response]:", JSON.stringify(result, null, 2))
+      
+      // 2. Handle API failure: Return 'error' status and the result data
       if (!res.ok) {
         return { 
           status: "error", 
@@ -72,17 +74,20 @@ class FluidPayProviderService extends AbstractPaymentProvider {
         }
       }
 
-      // 3. Return 'captured' status and payload on success
+      // 3. SUCCESS: Must return 'captured' status and session data
+      // This resolves the "not authorized with provider" error.
       return {
         status: "captured",
         data: {
           ...paymentSessionData,
           fluidpay_id: result.data?.id,
           fluidpay_vault_id: result.data?.payment_method?.token,
+          // Include essential fields in data to ensure Medusa persists them
+          authorized_at: new Date().toISOString(),
         },
       }
     } catch (e: any) {
-      // 4. Global catch must also return valid status and data
+      // 4. Global catch returns valid status and data to prevent backend crash
       return { 
         status: "error", 
         data: paymentSessionData || {}, 
