@@ -83,26 +83,26 @@ const FluidPayPaymentButton = ({
     const handleTokenReceived = async (event: any) => {
       const token = event.detail
       try {
-        console.log("[PaymentButton] Received token, updating session with propagation...")
+        console.log("[PaymentButton] Received token from event:", token)
         
-        // ✅ HARDENED: Passing the token in multiple standard paths to ensure backend visibility
+        // ✅ DEEP PERSISTENCE: Send the token in nested objects to ensure it hits the DB
         await initiatePaymentSession(cart, {
           provider_id: "pp_fluidpay_fluidpay",
           data: { 
             token: token,
-            metadata: { token: token },
-            fluidpay_token: token 
+            fluidpay_token: token,
+            data: { token: token } // Some versions of Medusa wrap 'data' in another 'data' object
           }
         })
 
-        // Give the Medusa DB an extra moment to settle the session update
-        await sleep(1000)
+        // Wait significantly longer for DB sync
+        await sleep(1500)
 
-        console.log("[PaymentButton] Completing order placement...")
+        console.log("[PaymentButton] Triggering placeOrder server action...")
         await placeOrder()
       } catch (err: any) {
-        console.error("[PaymentButton] Error during checkout flow:", err)
-        setErrorMessage(err.message || "Payment authorization failed. Please try again.")
+        console.error("[PaymentButton] Error:", err)
+        setErrorMessage(err.message || "Checkout failed.")
         setSubmitting(false)
       }
     }
@@ -166,21 +166,16 @@ const StripePaymentButton = ({
 
   const handlePayment = async () => {
     setSubmitting(true)
-
     if (!stripe || !elements || !card || !cart) {
       setSubmitting(false)
       return
     }
-
     await stripe
       .confirmCardPayment(session?.data.client_secret as string, {
         payment_method: {
           card: card,
           billing_details: {
-            name:
-              cart.billing_address?.first_name +
-              " " +
-              cart.billing_address?.last_name,
+            name: cart.billing_address?.first_name + " " + cart.billing_address?.last_name,
             address: {
               city: cart.billing_address?.city ?? undefined,
               country: cart.billing_address?.country_code ?? undefined,
@@ -197,19 +192,13 @@ const StripePaymentButton = ({
       .then(({ error, paymentIntent }) => {
         if (error) {
           const pi = error.payment_intent
-          if (
-            (pi && pi.status === "requires_capture") ||
-            (pi && pi.status === "succeeded")
-          ) {
+          if ((pi && pi.status === "requires_capture") || (pi && pi.status === "succeeded")) {
             onPaymentCompleted()
           }
           setErrorMessage(error.message || null)
           return
         }
-        if (
-          (paymentIntent && paymentIntent.status === "requires_capture") ||
-          paymentIntent.status === "succeeded"
-        ) {
+        if ((paymentIntent && paymentIntent.status === "requires_capture") || paymentIntent.status === "succeeded") {
           return onPaymentCompleted()
         }
       })
@@ -226,10 +215,7 @@ const StripePaymentButton = ({
       >
         Place order
       </Button>
-      <ErrorMessage
-        error={errorMessage}
-        data-testid="stripe-payment-error-message"
-      />
+      <ErrorMessage error={errorMessage} data-testid="stripe-payment-error-message" />
     </>
   )
 }
@@ -245,7 +231,6 @@ const PayPalPaymentButton = ({
 }) => {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
   const onPaymentCompleted = async () => {
     await placeOrder()
       .catch((err) => {
@@ -255,34 +240,21 @@ const PayPalPaymentButton = ({
         setSubmitting(false)
       })
   }
-
-  const session = cart.payment_collection?.payment_sessions?.find(
-    (s) => s.status === "pending"
-  )
-
-  const handlePayment = async (
-    _data: OnApproveData,
-    actions: OnApproveActions
-  ) => {
-    actions?.order
-      ?.authorize()
-      .then((authorization) => {
-        if (authorization.status !== "COMPLETED") {
-          setErrorMessage(`An error occurred, status: ${authorization.status}`)
-          return
-        }
-        onPaymentCompleted()
-      })
-      .catch(() => {
-        setErrorMessage(`An unknown error occurred, please try again.`)
-        setSubmitting(false)
-      })
+  const session = cart.payment_collection?.payment_sessions?.find((s) => s.status === "pending")
+  const handlePayment = async (_data: OnApproveData, actions: OnApproveActions) => {
+    actions?.order?.authorize().then((authorization) => {
+      if (authorization.status !== "COMPLETED") {
+        setErrorMessage(`An error occurred, status: ${authorization.status}`)
+        return
+      }
+      onPaymentCompleted()
+    }).catch(() => {
+      setErrorMessage(`An unknown error occurred, please try again.`)
+      setSubmitting(false)
+    })
   }
-
   const [{ isPending, isResolved }] = usePayPalScriptReducer()
-
   if (isPending) return <Spinner />
-
   if (isResolved) {
     return (
       <>
@@ -293,10 +265,7 @@ const PayPalPaymentButton = ({
           disabled={notReady || submitting || isPending}
           data-testid={dataTestId}
         />
-        <ErrorMessage
-          error={errorMessage}
-          data-testid="paypal-payment-error-message"
-        />
+        <ErrorMessage error={errorMessage} data-testid="paypal-payment-error-message" />
       </>
     )
   }
@@ -305,37 +274,19 @@ const PayPalPaymentButton = ({
 const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
   const onPaymentCompleted = async () => {
-    await placeOrder()
-      .catch((err) => {
-        setErrorMessage(err.message)
-      })
-      .finally(() => {
-        setSubmitting(false)
-      })
+    await placeOrder().catch((err) => { setErrorMessage(err.message) }).finally(() => { setSubmitting(false) })
   }
-
   const handlePayment = () => {
     setSubmitting(true)
     onPaymentCompleted()
   }
-
   return (
     <>
-      <Button
-        disabled={notReady}
-        isLoading={submitting}
-        onClick={handlePayment}
-        size="large"
-        data-testid="submit-order-button"
-      >
+      <Button disabled={notReady} isLoading={submitting} onClick={handlePayment} size="large" data-testid="submit-order-button">
         Place order
       </Button>
-      <ErrorMessage
-        error={errorMessage}
-        data-testid="manual-payment-error-message"
-      />
+      <ErrorMessage error={errorMessage} data-testid="manual-payment-error-message" />
     </>
   )
 }

@@ -26,32 +26,33 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     }
   }
 
-  // Hardened for Medusa 2.0 to catch tokens across multiple data paths
   async authorizePayment(input: any): Promise<any> {
     const { paymentSessionData, context } = input
     
-    // ✅ Check all possible paths for the token to fix 'Token Present: false'
+    // ✅ DEBUG: Log the entire session object to find the missing token
+    console.log("*****************************************")
+    console.log("FULL SESSION DATA INSPECTION:", JSON.stringify(paymentSessionData, null, 2))
+    
+    // Look in every possible nested location
     const token = paymentSessionData?.token || 
-                  paymentSessionData?.metadata?.token || 
-                  paymentSessionData?.data?.token ||
-                  paymentSessionData?.fluidpay_token
+                  paymentSessionData?.data?.token || 
+                  paymentSessionData?.metadata?.token ||
+                  paymentSessionData?.fluidpay_token ||
+                  (paymentSessionData?.data as any)?.fluidpay_token
 
     const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey
     const baseUrl = this.getApiUrl()
 
-    // EXTREME LOGGING: Now updated to show exactly where the token was found
-    console.log("*****************************************")
-    console.log("FLUIDPAY AUTHORIZE ATTEMPT STARTED")
+    console.log("FLUIDPAY AUTHORIZE ATTEMPT")
     console.log("Cart ID:", context?.cart_id || paymentSessionData?.cart_id)
     console.log("Token Found:", !!token)
-    if (token) console.log("Token Source verified.")
     console.log("*****************************************")
 
     if (!token) {
       return { 
         status: "error", 
         data: paymentSessionData || {}, 
-        error: "Missing FluidPay token - Session data was empty." 
+        error: "Missing FluidPay token - check backend logs for FULL SESSION DATA INSPECTION" 
       }
     }
 
@@ -77,7 +78,6 @@ class FluidPayProviderService extends AbstractPaymentProvider {
       console.log("[FluidPay API Success Response]:", JSON.stringify(result, null, 2))
       
       if (!res.ok) {
-        console.error("[FluidPay API Error Response]:", JSON.stringify(result, null, 2))
         return { 
           status: "error", 
           data: result?.data || result || {}, 
@@ -85,8 +85,7 @@ class FluidPayProviderService extends AbstractPaymentProvider {
         }
       }
 
-      // Medusa 2.0 requirement: status must be "captured" or "authorized"
-      const finalResult = {
+      return {
         status: "captured",
         data: {
           ...paymentSessionData,
@@ -95,11 +94,7 @@ class FluidPayProviderService extends AbstractPaymentProvider {
         },
       }
 
-      console.log("[Medusa Final Success Return]:", JSON.stringify(finalResult, null, 2))
-      return finalResult
-
     } catch (e: any) {
-      console.error("[FluidPay Critical Catch]:", e.message)
       return { 
         status: "error", 
         data: paymentSessionData || {}, 
