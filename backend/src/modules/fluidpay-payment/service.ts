@@ -1,5 +1,10 @@
 import { AbstractPaymentProvider } from "@medusajs/framework/utils"
 
+type FluidPayOptions = {
+  baseUrl?: string
+  secretKey: string
+}
+
 class FluidPayProviderService extends AbstractPaymentProvider {
   static identifier = "fluidpay"
 
@@ -7,6 +12,7 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     return process.env.FLUIDPAY_API_URL || "https://sandbox.fluidpay.com/api"
   }
 
+  // Required by Medusa v2 to handle webhooks
   async getWebhookActionAndData(data: any): Promise<any> {
     return { action: "not_supported", data: {} }
   }
@@ -24,14 +30,21 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     const { paymentSessionData, context } = input
     const sessionData = paymentSessionData || input || {}
     
+    // Search for the secure token
     const token = sessionData?.token || 
                   sessionData?.data?.token || 
                   sessionData?.metadata?.token ||
                   sessionData?.fluidpay_token
 
-    // ✅ Fix: Use the Medusa cent value directly
-    const amountCents = Number(context?.amount || sessionData?.amount || sessionData?.data?.amount || 0);
+    // ✅ FIX: Convert dollar value (25) to cents (2500)
+    const rawAmount = context?.amount || sessionData?.amount || sessionData?.data?.amount || 0;
+    const amountCents = Math.round(Number(rawAmount) * 100); 
+
     const apiKey = process.env.FLUIDPAY_SECRET_KEY || (this as any).options_.secretKey;
+    const baseUrl = this.getApiUrl();
+
+    // Verify values before hitting the API
+    console.log("Processing Amount in Cents:", amountCents);
 
     if (!token || amountCents <= 0) {
       return { 
@@ -42,7 +55,7 @@ class FluidPayProviderService extends AbstractPaymentProvider {
     }
 
     try {
-      const res = await fetch(`${this.getApiUrl()}/transaction`, {
+      const res = await fetch(`${baseUrl}/transaction`, {
         method: "POST",
         headers: {
           "Authorization": apiKey,
@@ -67,6 +80,7 @@ class FluidPayProviderService extends AbstractPaymentProvider {
         }
       }
 
+      // Success: Return 'captured' status for sale transactions
       return {
         status: "captured",
         data: {

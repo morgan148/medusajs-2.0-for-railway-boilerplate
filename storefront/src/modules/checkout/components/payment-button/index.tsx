@@ -83,26 +83,22 @@ const FluidPayPaymentButton = ({
     const handleTokenReceived = async (event: any) => {
       const token = event.detail
       try {
-        console.log("[PaymentButton] Received token, broadcasting to backend...", token)
+        console.log("[PaymentButton] Received token, initiating session update...")
         
-        // ✅ TRIPLE-PATH DATA PROPAGATION
+        // Broadcast the token to the backend session
         await initiatePaymentSession(cart, {
           provider_id: "pp_fluidpay_fluidpay",
-          data: { 
-            token: token,
-            fluidpay_token: token,
-            data: { token: token } // Backup nested path
-          }
+          data: { token: token }
         })
 
-        // Increase wait time to ensure Railway DB consistency
-        await sleep(2000)
+        // Current requirement: Pause to allow DB propagation
+        await sleep(1500)
 
-        console.log("[PaymentButton] Finalizing Place Order...")
+        console.log("[PaymentButton] Finalizing order...")
         await placeOrder()
       } catch (err: any) {
-        console.error("[PaymentButton] Error:", err)
-        setErrorMessage(err.message || "The payment session could not be authorized.")
+        console.error("[PaymentButton] checkout Error:", err)
+        setErrorMessage(err.message || "An error occurred during payment authorization.")
         setSubmitting(false)
       }
     }
@@ -131,8 +127,6 @@ const FluidPayPaymentButton = ({
     </>
   )
 }
-
-// ... rest of the file (Stripe, PayPal, etc.) remains exactly the same as your current version
 
 const StripePaymentButton = ({
   cart,
