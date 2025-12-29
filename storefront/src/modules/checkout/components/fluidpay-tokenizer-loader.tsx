@@ -1,140 +1,126 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-
-declare global {
-  interface Window {
-    Tokenizer?: any
-    __fpTokenizerInstance?: any
-  }
-}
+import { storeFluidPayTokenOnCart } from "@lib/data/fluidpay"
 
 type Props = {
-  srcBaseUrl: string // ex: https://sandbox.fluidpay.com
-  publicKey?: string // optional override, otherwise read from env
-  onToken?: (token: string, rawResponse?: any) => void
+  srcBaseUrl: string
+  cartId: string
+  publicKey: string
+}
+
+function extractToken(resp: any): string | null {
+  // We don’t want to guess wrong; we try common shapes and fall back to null.
+  // After you see the exact response in console once, we can tighten this.
+  return (
+    resp?.token ||
+    resp?.data?.token ||
+    resp?.payment_token ||
+    resp?.data?.payment_token ||
+    resp?.id ||
+    resp?.data?.id ||
+    null
+  )
 }
 
 export default function FluidPayTokenizerLoader({
   srcBaseUrl,
+  cartId,
   publicKey,
-  onToken,
 }: Props) {
   const [status, setStatus] = useState<
-    "idle" | "loading" | "loaded" | "error" | "ready"
+    "idle" | "loading" | "loaded" | "ready" | "saving" | "saved" | "error"
   >("idle")
   const [message, setMessage] = useState<string>("")
 
-  const resolvedKey =
-    publicKey || process.env.NEXT_PUBLIC_FLUIDPAY_PUBLIC_KEY || ""
-
   const scriptSrc = useMemo(() => {
-    const base = (srcBaseUrl || "").replace(/\/$/, "")
-    return `${base}/tokenizer/tokenizer.js`
+    // FluidPay tokenizer script URL pattern from your network screenshot:
+    // https://sandbox.fluidpay.com/tokenizer/tokenizer.js
+    // So srcBaseUrl should be "https://sandbox.fluidpay.com"
+    return `${srcBaseUrl.replace(/\/$/, "")}/tokenizer/tokenizer.js`
   }, [srcBaseUrl])
 
   useEffect(() => {
-    // Basic guard rails
-    if (!srcBaseUrl) {
+    if (!srcBaseUrl || !cartId || !publicKey) {
       setStatus("error")
-      setMessage("Missing NEXT_PUBLIC_FLUIDPAY_BASE_URL")
-      return
-    }
-    if (!resolvedKey) {
-      setStatus("error")
-      setMessage("Missing NEXT_PUBLIC_FLUIDPAY_PUBLIC_KEY")
+      setMessage("Missing srcBaseUrl, cartId, or publicKey")
       return
     }
 
     setStatus("loading")
     setMessage(`Loading: ${scriptSrc}`)
 
-    // If script already exists, don't add it again
-    const existing = document.querySelector(
-      'script[data-fp-tokenizer="true"]'
-    ) as HTMLScriptElement | null
+    // Avoid loading the script multiple times
+    const existing = document.querySelector('script[data-fp-tokenizer="true"]')
+    if (!existing) {
+      const script = document.createElement("script")
+      script.src = scriptSrc
+      script.async = true
+      script.defer = true
+      script.dataset.fpTokenizer = "true"
 
-    const loadScript = () =>
-      new Promise<void>((resolve, reject) => {
-        if (existing) return resolve()
-
-        const script = document.createElement("script")
-        script.src = scriptSrc
-        script.async = true
-        script.defer = true
-        script.dataset.fpTokenizer = "true"
-
-        script.onload = () => resolve()
-        script.onerror = () => reject(new Error(`Failed loading ${scriptSrc}`))
-
-        document.head.appendChild(script)
-      })
-
-    const setupTokenizer = async () => {
-      try {
-        await loadScript()
+      script.onload = () => {
         setStatus("loaded")
         setMessage("Tokenizer script loaded")
-
-        // Wait for window.Tokenizer to exist (sometimes it’s not immediate)
-        const started = Date.now()
-        while (!window.Tokenizer) {
-          if (Date.now() - started > 4000) {
-            throw new Error("Tokenizer global not found on window")
-          }
-          await new Promise((r) => setTimeout(r, 50))
-        }
-
-        // Create instance once (avoid duplicates on re-render)
-        if (!window.__fpTokenizerInstance) {
-          window.__fpTokenizerInstance = new window.Tokenizer({
-            url: srcBaseUrl, // docs: optional, but we set it explicitly
-            apikey: resolvedKey,
-            container: "#fp-tokenizer-container",
-            submission: (resp: any) => {
-              // resp structure depends on FluidPay; we’ll extract the token defensively
-              const token =
-                resp?.token ||
-                resp?.data?.token ||
-                resp?.payment_token ||
-                resp?.data?.payment_token
-
-              console.log("FluidPay Tokenizer submission response:", resp)
-              if (token) {
-                console.log("FluidPay token:", token)
-                onToken?.(token, resp)
-              }
-            },
-          })
-        }
-
-        setStatus("ready")
-        setMessage("Tokenizer ready (iframe should be visible below)")
-      } catch (e: any) {
-        setStatus("error")
-        setMessage(e?.message || "Tokenizer failed to initialize")
       }
+
+      script.onerror = () => {
+        setStatus("error")
+        setMessage(`Failed loading tokenizer from ${scriptSrc}`)
+      }
+
+      document.head.appendChild(script)
+    } else {
+      setStatus("loaded")
+      setMessage("Tokenizer script already loaded")
+    }
+  }, [srcBaseUrl, cartId, publicKey, scriptSrc])
+
+  useEffect(() => {
+    if (status !== "loaded") return
+
+    const w = window as any
+    if (!w.Tokenizer) {
+      setStatus("error")
+      setMessage("Tokenizer global not found on window")
+      return
     }
 
-    setupTokenizer()
-  }, [scriptSrc, srcBaseUrl, resolvedKey, onToken])
+    setStatus("ready")
+    setMessage("Tokenizer ready (iframe should be visible below)")
 
-  return (
-    <div className="mt-3 text-sm">
-      <div className="font-medium">FluidPay Tokenizer</div>
-      <div>
-        Status:{" "}
-        <span className="font-mono">
-          {status}
-        </span>
-      </div>
-      {message ? <div className="text-ui-fg-subtle">{message}</div> : null}
+    // Mount tokenizer iframe into #fp-tokenizer-container
+    const instance = new w.Tokenizer({
+      url: srcBaseUrl, // docs say optional; safe to pass
+      apikey: publicKey,
+      container: "#fp-tokenizer-container",
+      submission: async (resp: any) => {
+        try {
+          // Keep this temporarily until you confirm exact token field
+          console.log("FluidPay submission response:", resp)
 
-      {/* Tokenizer iframe mounts here */}
-      <div
-        id="fp-tokenizer-container"
-        className="mt-3 rounded-md border border-ui-border-base p-3 bg-ui-bg-field"
-      />
-    </div>
-  )
+          const token = extractToken(resp)
+          if (!token) {
+            throw new Error("Could not find token in tokenizer response")
+          }
+
+          setStatus("saving")
+          setMessage("Saving token to cart...")
+
+          await storeFluidPayTokenOnCart(cartId, token)
+
+          setStatus("saved")
+          setMessage("Token saved to cart")
+        } catch (e: any) {
+          setStatus("error")
+          setMessage(e?.message || "Failed saving token")
+        }
+      },
+    })
+
+    // Optional: if you need a reference later:
+    w.__fpTokenizer = instance
+  }, [status, srcBaseUrl, cartId, publicKey])
+
+  return <div id="fp-tokenizer-container" className="mt-3" />
 }

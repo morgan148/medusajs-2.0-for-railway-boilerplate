@@ -200,7 +200,13 @@ const Payment = ({
               )}
 
               {/* FluidPay tokenizer (default path) */}
-              {isFluidPay && <FluidPayTokenizerLoader srcBaseUrl={fpBaseUrl} />}
+              {isFluidPay && (
+                <FluidPayTokenizerLoader
+    srcBaseUrl={fpBaseUrl}
+    cartId={cart?.id || "" || ""}
+    publicKey={process.env.NEXT_PUBLIC_FLUIDPAY_PUBLIC_KEY || ""}
+  />
+)}
 
               {/* Stripe card element (only if Stripe is selected) */}
               {isStripe && stripeReady && (
