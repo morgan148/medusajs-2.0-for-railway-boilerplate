@@ -101,17 +101,27 @@ export const addCustomerAddress = async (
   _currentState: unknown,
   formData: FormData
 ): Promise<any> => {
+  // Helper to get form value, checking both direct and prefixed field names
+  const getFormValue = (fieldName: string): string => {
+    return (
+      (formData.get(fieldName) ||
+        formData.get(`billing_address.${fieldName}`) ||
+        formData.get(`shipping_address.${fieldName}`) ||
+        "") as string
+    )
+  }
+
   const address = {
-    first_name: formData.get("first_name") as string,
-    last_name: formData.get("last_name") as string,
-    company: formData.get("company") as string,
-    address_1: formData.get("address_1") as string,
-    address_2: formData.get("address_2") as string,
-    city: formData.get("city") as string,
-    postal_code: formData.get("postal_code") as string,
-    province: formData.get("province") as string,
-    country_code: formData.get("country_code") as string,
-    phone: formData.get("phone") as string,
+    first_name: getFormValue("first_name"),
+    last_name: getFormValue("last_name"),
+    company: getFormValue("company"),
+    address_1: getFormValue("address_1"),
+    address_2: getFormValue("address_2"),
+    city: getFormValue("city"),
+    postal_code: getFormValue("postal_code"),
+    province: getFormValue("province"),
+    country_code: getFormValue("country_code"),
+    phone: getFormValue("phone"),
   }
 
   return sdk.store.customer
@@ -143,17 +153,31 @@ export const updateCustomerAddress = async (
 ): Promise<any> => {
   const addressId = currentState.addressId as string
 
+  if (!addressId) {
+    return { success: false, error: "Address ID is required" }
+  }
+
+  // Helper to get form value, checking both direct and prefixed field names
+  const getFormValue = (fieldName: string): string => {
+    return (
+      (formData.get(fieldName) ||
+        formData.get(`billing_address.${fieldName}`) ||
+        formData.get(`shipping_address.${fieldName}`) ||
+        "") as string
+    )
+  }
+
   const address = {
-    first_name: formData.get("first_name") as string,
-    last_name: formData.get("last_name") as string,
-    company: formData.get("company") as string,
-    address_1: formData.get("address_1") as string,
-    address_2: formData.get("address_2") as string,
-    city: formData.get("city") as string,
-    postal_code: formData.get("postal_code") as string,
-    province: formData.get("province") as string,
-    country_code: formData.get("country_code") as string,
-    phone: formData.get("phone") as string,
+    first_name: getFormValue("first_name"),
+    last_name: getFormValue("last_name"),
+    company: getFormValue("company"),
+    address_1: getFormValue("address_1"),
+    address_2: getFormValue("address_2"),
+    city: getFormValue("city"),
+    postal_code: getFormValue("postal_code"),
+    province: getFormValue("province"),
+    country_code: getFormValue("country_code"),
+    phone: getFormValue("phone"),
   }
 
   return sdk.store.customer

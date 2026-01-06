@@ -15,7 +15,7 @@ type MyInformationProps = {
   regions: HttpTypes.StoreRegion[]
 }
 
-const ProfileBillingAddress: React.FC<MyInformationProps> = ({
+const ProfileShippingAddress: React.FC<MyInformationProps> = ({
   customer,
   regions,
 }) => {
@@ -34,8 +34,8 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
 
   const [successState, setSuccessState] = React.useState(false)
 
-  const billingAddress = customer.addresses?.find(
-    (addr) => addr.is_default_billing
+  const shippingAddress = customer.addresses?.find(
+    (addr) => addr.is_default_shipping
   )
 
   // Create a wrapper function that handles both create and update
@@ -43,7 +43,7 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
     currentState: Record<string, unknown>,
     formData: FormData
   ) => {
-    if (billingAddress) {
+    if (shippingAddress) {
       return updateCustomerAddress(currentState, formData)
     } else {
       return addCustomerAddress(currentState, formData)
@@ -53,7 +53,7 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
   const [state, formAction] = useFormState(handleAddressAction, {
     error: false,
     success: false,
-    addressId: billingAddress?.id || undefined,
+    addressId: shippingAddress?.id || undefined,
   })
 
   const clearState = () => {
@@ -65,106 +65,106 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
   }, [state])
 
   const currentInfo = useMemo(() => {
-    if (!billingAddress) {
-      return "No billing address"
+    if (!shippingAddress) {
+      return "No shipping address"
     }
 
     const country =
       regionOptions?.find(
-        (country) => country?.value === billingAddress.country_code
-      )?.label || billingAddress.country_code?.toUpperCase()
+        (country) => country?.value === shippingAddress.country_code
+      )?.label || shippingAddress.country_code?.toUpperCase()
 
     return (
       <div className="flex flex-col font-semibold" data-testid="current-info">
         <span>
-          {billingAddress.first_name} {billingAddress.last_name}
+          {shippingAddress.first_name} {shippingAddress.last_name}
         </span>
-        <span>{billingAddress.company}</span>
+        <span>{shippingAddress.company}</span>
         <span>
-          {billingAddress.address_1}
-          {billingAddress.address_2 ? `, ${billingAddress.address_2}` : ""}
+          {shippingAddress.address_1}
+          {shippingAddress.address_2 ? `, ${shippingAddress.address_2}` : ""}
         </span>
         <span>
-          {billingAddress.postal_code}, {billingAddress.city}
+          {shippingAddress.postal_code}, {shippingAddress.city}
         </span>
         <span>{country}</span>
       </div>
     )
-  }, [billingAddress, regionOptions])
+  }, [shippingAddress, regionOptions])
 
   return (
     <form action={formAction} onReset={() => clearState()} className="w-full">
       <AccountInfo
-        label="Billing address"
+        label="Shipping address"
         currentInfo={currentInfo}
         isSuccess={successState}
         isError={!!state.error}
         clearState={clearState}
-        data-testid="account-billing-address-editor"
+        data-testid="account-shipping-address-editor"
       >
         <div className="grid grid-cols-1 gap-y-2">
           <div className="grid grid-cols-2 gap-x-2">
             <Input
               label="First name"
-              name="billing_address.first_name"
-              defaultValue={billingAddress?.first_name || undefined}
+              name="shipping_address.first_name"
+              defaultValue={shippingAddress?.first_name || undefined}
               required
-              data-testid="billing-first-name-input"
+              data-testid="shipping-first-name-input"
             />
             <Input
               label="Last name"
-              name="billing_address.last_name"
-              defaultValue={billingAddress?.last_name || undefined}
+              name="shipping_address.last_name"
+              defaultValue={shippingAddress?.last_name || undefined}
               required
-              data-testid="billing-last-name-input"
+              data-testid="shipping-last-name-input"
             />
           </div>
           <Input
             label="Company"
-            name="billing_address.company"
-            defaultValue={billingAddress?.company || undefined}
-            data-testid="billing-company-input"
+            name="shipping_address.company"
+            defaultValue={shippingAddress?.company || undefined}
+            data-testid="shipping-company-input"
           />
           <Input
             label="Address"
-            name="billing_address.address_1"
-            defaultValue={billingAddress?.address_1 || undefined}
+            name="shipping_address.address_1"
+            defaultValue={shippingAddress?.address_1 || undefined}
             required
-            data-testid="billing-address-1-input"
+            data-testid="shipping-address-1-input"
           />
           <Input
             label="Apartment, suite, etc."
-            name="billing_address.address_2"
-            defaultValue={billingAddress?.address_2 || undefined}
-            data-testid="billing-address-2-input"
+            name="shipping_address.address_2"
+            defaultValue={shippingAddress?.address_2 || undefined}
+            data-testid="shipping-address-2-input"
           />
           <div className="grid grid-cols-[144px_1fr] gap-x-2">
             <Input
               label="Postal code"
-              name="billing_address.postal_code"
-              defaultValue={billingAddress?.postal_code || undefined}
+              name="shipping_address.postal_code"
+              defaultValue={shippingAddress?.postal_code || undefined}
               required
-              data-testid="billing-postcal-code-input"
+              data-testid="shipping-postal-code-input"
             />
             <Input
               label="City"
-              name="billing_address.city"
-              defaultValue={billingAddress?.city || undefined}
+              name="shipping_address.city"
+              defaultValue={shippingAddress?.city || undefined}
               required
-              data-testid="billing-city-input"
+              data-testid="shipping-city-input"
             />
           </div>
           <Input
             label="Province"
-            name="billing_address.province"
-            defaultValue={billingAddress?.province || undefined}
-            data-testid="billing-province-input"
+            name="shipping_address.province"
+            defaultValue={shippingAddress?.province || undefined}
+            data-testid="shipping-province-input"
           />
           <NativeSelect
-            name="billing_address.country_code"
-            defaultValue={billingAddress?.country_code || undefined}
+            name="shipping_address.country_code"
+            defaultValue={shippingAddress?.country_code || undefined}
             required
-            data-testid="billing-country-code-select"
+            data-testid="shipping-country-code-select"
           >
             <option value="">-</option>
             {regionOptions.map((option, i) => {
@@ -177,9 +177,9 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
           </NativeSelect>
           <Input
             label="Phone"
-            name="billing_address.phone"
-            defaultValue={billingAddress?.phone || undefined}
-            data-testid="billing-phone-input"
+            name="shipping_address.phone"
+            defaultValue={shippingAddress?.phone || undefined}
+            data-testid="shipping-phone-input"
           />
         </div>
       </AccountInfo>
@@ -187,4 +187,5 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
   )
 }
 
-export default ProfileBillingAddress
+export default ProfileShippingAddress
+

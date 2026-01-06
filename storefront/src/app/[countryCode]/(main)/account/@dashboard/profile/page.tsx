@@ -2,6 +2,7 @@ import { Metadata } from "next"
 
 import ProfilePhone from "@modules/account//components/profile-phone"
 import ProfileBillingAddress from "@modules/account/components/profile-billing-address"
+import ProfileShippingAddress from "@modules/account/components/profile-shipping-address"
 import ProfileEmail from "@modules/account/components/profile-email"
 import ProfileName from "@modules/account/components/profile-name"
 import ProfilePassword from "@modules/account/components/profile-password"
@@ -29,7 +30,7 @@ export default async function Profile() {
         <h1 className="text-2xl-semi">Profile</h1>
         <p className="text-base-regular">
           View and update your profile information, including your name, email,
-          and phone number. You can also update your billing address, or change
+          and phone number. You can also update your billing and shipping addresses, or change
           your password.
         </p>
       </div>
@@ -43,6 +44,8 @@ export default async function Profile() {
         <ProfilePassword customer={customer} />
         <Divider />
         <ProfileBillingAddress customer={customer} regions={regions} />
+        <Divider />
+        <ProfileShippingAddress customer={customer} regions={regions} />
       </div>
     </div>
   )
