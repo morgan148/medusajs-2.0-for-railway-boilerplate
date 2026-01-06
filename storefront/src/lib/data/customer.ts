@@ -10,9 +10,8 @@ import { cache } from "react"
 import { getAuthHeaders, removeAuthToken, setAuthToken } from "./cookies"
 
 export const getCustomer = cache(async function () {
-  const authHeaders = await getAuthHeaders()
   return await sdk.store.customer
-    .retrieve({}, { ...authHeaders } as any)
+    .retrieve({}, {}, await getAuthHeaders())
     .then(({ customer }) => customer)
     .catch(() => null)
 })
@@ -20,9 +19,8 @@ export const getCustomer = cache(async function () {
 export const updateCustomer = cache(async function (
   body: HttpTypes.StoreUpdateCustomer
 ) {
-  const authHeaders = await getAuthHeaders()
   const updateRes = await sdk.store.customer
-    .update(body, { ...authHeaders } as any)
+    .update(body, {}, await getAuthHeaders())
     .then(({ customer }) => customer)
     .catch(medusaError)
 
@@ -108,9 +106,8 @@ export const addCustomerAddress = async (
     phone: formData.get("phone") as string,
   }
 
-  const authHeaders = await getAuthHeaders()
   return sdk.store.customer
-    .createAddress(address, { ...authHeaders } as any)
+    .createAddress(address, {}, await getAuthHeaders())
     .then(() => {
       revalidateTag("customer")
       return { success: true, error: null }
@@ -121,9 +118,8 @@ export const addCustomerAddress = async (
 }
 
 export const deleteCustomerAddress = async (addressId: string): Promise<void> => {
-  const authHeaders = await getAuthHeaders()
   await sdk.store.customer
-    .deleteAddress(addressId, { ...authHeaders } as any)
+    .deleteAddress(addressId, await getAuthHeaders())
     .then(() => {
       revalidateTag("customer")
       return { success: true, error: null }
@@ -152,9 +148,8 @@ export const updateCustomerAddress = async (
     phone: formData.get("phone") as string,
   }
 
-  const authHeaders = await getAuthHeaders()
   return sdk.store.customer
-    .updateAddress(addressId, address, { ...authHeaders } as any)
+    .updateAddress(addressId, address, {}, await getAuthHeaders())
     .then(() => {
       revalidateTag("customer")
       return { success: true, error: null }
