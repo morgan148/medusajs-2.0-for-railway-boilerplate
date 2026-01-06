@@ -111,7 +111,11 @@ export const addCustomerAddress = async (
     )
   }
 
-  const address = {
+  // Determine if this is a billing or shipping address based on form field prefix
+  const isBillingAddress = !!formData.get("billing_address.first_name")
+  const isShippingAddress = !!formData.get("shipping_address.first_name")
+
+  const address: any = {
     first_name: getFormValue("first_name"),
     last_name: getFormValue("last_name"),
     company: getFormValue("company"),
@@ -122,6 +126,44 @@ export const addCustomerAddress = async (
     province: getFormValue("province"),
     country_code: getFormValue("country_code"),
     phone: getFormValue("phone"),
+  }
+
+  // Set default flags based on address type
+  if (isBillingAddress) {
+    address.is_default_billing = true
+  }
+  if (isShippingAddress) {
+    address.is_default_shipping = true
+  }
+
+  // For billing address idempotency: remove default billing from other addresses
+  if (isBillingAddress) {
+    try {
+      // Fetch customer directly to avoid cache issues
+      const { customer } = await sdk.store.customer.retrieve({}, {}, await getAuthHeaders())
+      if (customer?.addresses) {
+        // Find existing default billing address
+        const existingDefaultBilling = customer.addresses.find(
+          (addr) => addr.is_default_billing
+        )
+        
+        // If one exists, remove the default flag before creating new one
+        if (existingDefaultBilling) {
+          await sdk.store.customer
+            .updateAddress(
+              existingDefaultBilling.id,
+              { is_default_billing: false },
+              {},
+              await getAuthHeaders()
+            )
+            .catch(() => {
+              // Ignore errors - address might not exist anymore
+            })
+        }
+      }
+    } catch (err) {
+      // Ignore errors - continue with address creation
+    }
   }
 
   return sdk.store.customer
@@ -167,7 +209,11 @@ export const updateCustomerAddress = async (
     )
   }
 
-  const address = {
+  // Determine if this is a billing or shipping address based on form field prefix
+  const isBillingAddress = !!formData.get("billing_address.first_name")
+  const isShippingAddress = !!formData.get("shipping_address.first_name")
+
+  const address: any = {
     first_name: getFormValue("first_name"),
     last_name: getFormValue("last_name"),
     company: getFormValue("company"),
@@ -178,6 +224,41 @@ export const updateCustomerAddress = async (
     province: getFormValue("province"),
     country_code: getFormValue("country_code"),
     phone: getFormValue("phone"),
+  }
+
+  // Set default flags based on address type
+  if (isBillingAddress) {
+    address.is_default_billing = true
+    
+    // For billing address idempotency: remove default billing from other addresses
+    try {
+      // Fetch customer directly to avoid cache issues
+      const { customer } = await sdk.store.customer.retrieve({}, {}, await getAuthHeaders())
+      if (customer?.addresses) {
+        const existingDefaultBilling = customer.addresses.find(
+          (addr) => addr.is_default_billing && addr.id !== addressId
+        )
+        
+        if (existingDefaultBilling) {
+          await sdk.store.customer
+            .updateAddress(
+              existingDefaultBilling.id,
+              { is_default_billing: false },
+              {},
+              await getAuthHeaders()
+            )
+            .catch(() => {
+              // Ignore errors
+            })
+        }
+      }
+    } catch (err) {
+      // Ignore errors - continue with address update
+    }
+  }
+  
+  if (isShippingAddress) {
+    address.is_default_shipping = true
   }
 
   return sdk.store.customer

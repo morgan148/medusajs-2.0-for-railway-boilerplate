@@ -3,12 +3,13 @@ import { Metadata } from "next"
 import ProfilePhone from "@modules/account//components/profile-phone"
 import ProfileBillingAddress from "@modules/account/components/profile-billing-address"
 import ProfileShippingAddress from "@modules/account/components/profile-shipping-address"
+import ProfileShippingAddressesList from "@modules/account/components/profile-shipping-addresses-list"
 import ProfileEmail from "@modules/account/components/profile-email"
 import ProfileName from "@modules/account/components/profile-name"
 import ProfilePassword from "@modules/account/components/profile-password"
 
 import { notFound } from "next/navigation"
-import { listRegions } from "@lib/data/regions"
+import { listRegions, getRegion } from "@lib/data/regions"
 import { getCustomer } from "@lib/data/customer"
 
 export const metadata: Metadata = {
@@ -16,11 +17,17 @@ export const metadata: Metadata = {
   description: "View and edit your Medusa Store profile.",
 }
 
-export default async function Profile() {
+export default async function Profile({
+  params,
+}: {
+  params: { countryCode: string }
+}) {
+  const { countryCode } = params
   const customer = await getCustomer()
   const regions = await listRegions()
+  const region = await getRegion(countryCode)
 
-  if (!customer || !regions) {
+  if (!customer || !regions || !region) {
     notFound()
   }
 
@@ -46,6 +53,8 @@ export default async function Profile() {
         <ProfileBillingAddress customer={customer} regions={regions} />
         <Divider />
         <ProfileShippingAddress customer={customer} regions={regions} />
+        <Divider />
+        <ProfileShippingAddressesList customer={customer} region={region} />
       </div>
     </div>
   )

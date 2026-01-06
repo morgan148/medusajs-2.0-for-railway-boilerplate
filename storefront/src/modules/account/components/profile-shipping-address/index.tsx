@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useEffect, useMemo } from "react"
+import { useRouter } from "next/navigation"
 
 import Input from "@modules/common/components/input"
 import NativeSelect from "@modules/common/components/native-select"
@@ -33,6 +34,7 @@ const ProfileShippingAddress: React.FC<MyInformationProps> = ({
   }, [regions])
 
   const [successState, setSuccessState] = React.useState(false)
+  const router = useRouter()
 
   const shippingAddress = customer.addresses?.find(
     (addr) => addr.is_default_shipping
@@ -61,8 +63,12 @@ const ProfileShippingAddress: React.FC<MyInformationProps> = ({
   }
 
   useEffect(() => {
-    setSuccessState(state.success)
-  }, [state])
+    if (state.success) {
+      setSuccessState(true)
+      // Refresh the page data to show the updated address
+      router.refresh()
+    }
+  }, [state.success, router])
 
   const currentInfo = useMemo(() => {
     if (!shippingAddress) {
