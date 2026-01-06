@@ -10,10 +10,18 @@ import { cache } from "react"
 import { getAuthHeaders, removeAuthToken, setAuthToken } from "./cookies"
 
 export const getCustomer = cache(async function () {
+  const authHeaders = await getAuthHeaders()
+  // Spread headers into options object like cart.retrieve does
   return await sdk.store.customer
-    .retrieve({}, {}, await getAuthHeaders())
+    .retrieve({}, { ...authHeaders } as any)
     .then(({ customer }) => customer)
-    .catch(() => null)
+    .catch((err) => {
+      // Log error in development to help debug
+      if (process.env.NODE_ENV === "development") {
+        console.error("[getCustomer] Error:", err.message, "Headers sent:", authHeaders)
+      }
+      return null
+    })
 })
 
 export const updateCustomer = cache(async function (

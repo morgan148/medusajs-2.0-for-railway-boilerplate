@@ -43,6 +43,16 @@ export const getAuthHeaders = async (): Promise<{
     headers.cookie = cookieHeader
   }
   
+  // Debug logging in development
+  if (process.env.NODE_ENV === "development") {
+    console.log("[getAuthHeaders] Generated headers:", {
+      hasAuth: !!headers.authorization,
+      hasCookie: !!headers.cookie,
+      cookieLength: headers.cookie?.length || 0,
+      cookiePreview: headers.cookie?.substring(0, 50) + "..." || "none",
+    })
+  }
+  
   return headers
 }
 
