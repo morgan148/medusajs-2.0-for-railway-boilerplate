@@ -36,9 +36,11 @@ const ProfileBillingAddress: React.FC<MyInformationProps> = ({
   const [successState, setSuccessState] = React.useState(false)
   const router = useRouter()
 
+  // Find default billing address, or use first address if no default is set
+  // This handles cases where addresses exist but weren't marked as default
   const billingAddress = customer.addresses?.find(
     (addr) => addr.is_default_billing
-  )
+  ) || (customer.addresses && customer.addresses.length > 0 ? customer.addresses[0] : undefined)
 
   // Create a wrapper function that handles both create and update
   const handleAddressAction = async (

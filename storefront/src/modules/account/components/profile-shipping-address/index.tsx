@@ -36,9 +36,11 @@ const ProfileShippingAddress: React.FC<MyInformationProps> = ({
   const [successState, setSuccessState] = React.useState(false)
   const router = useRouter()
 
+  // Find default shipping address, or use first address if no default is set
+  // This handles cases where addresses exist but weren't marked as default
   const shippingAddress = customer.addresses?.find(
     (addr) => addr.is_default_shipping
-  )
+  ) || (customer.addresses && customer.addresses.length > 0 ? customer.addresses[0] : undefined)
 
   // Create a wrapper function that handles both create and update
   const handleAddressAction = async (

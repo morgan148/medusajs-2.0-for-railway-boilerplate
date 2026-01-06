@@ -23,25 +23,32 @@ const ShippingAddressesList: React.FC<ShippingAddressesListProps> = ({
   customer,
   region,
 }) => {
-  // Get all shipping addresses (addresses that are default shipping or all addresses if none marked)
-  const shippingAddresses = useMemo(() => {
-    const defaultShipping = customer.addresses?.find(
+  // Get all addresses, sorted with defaults first
+  const allAddresses = useMemo(() => {
+    if (!customer.addresses || customer.addresses.length === 0) {
+      return []
+    }
+    
+    const defaultBilling = customer.addresses.find(
+      (addr) => addr.is_default_billing
+    )
+    const defaultShipping = customer.addresses.find(
       (addr) => addr.is_default_shipping
     )
     
-    // If there's a default shipping, show it first, then others
-    // Otherwise show all addresses
-    if (defaultShipping) {
-      const others = customer.addresses?.filter(
-        (addr) => addr.id !== defaultShipping.id
-      ) || []
-      return [defaultShipping, ...others]
-    }
+    // Sort: default addresses first, then others
+    const sorted = [...customer.addresses].sort((a, b) => {
+      const aIsDefault = a.is_default_billing || a.is_default_shipping
+      const bIsDefault = b.is_default_billing || b.is_default_shipping
+      if (aIsDefault && !bIsDefault) return -1
+      if (!aIsDefault && bIsDefault) return 1
+      return 0
+    })
     
-    return customer.addresses || []
+    return sorted
   }, [customer.addresses])
 
-  if (!shippingAddresses.length) {
+  if (!allAddresses.length) {
     return null
   }
 
@@ -49,14 +56,14 @@ const ShippingAddressesList: React.FC<ShippingAddressesListProps> = ({
     <div className="w-full">
       <div className="mb-4">
         <Heading level="h2" className="text-xl-semi">
-          All Shipping Addresses
+          All Addresses
         </Heading>
         <Text className="text-base-regular text-ui-fg-subtle mt-2">
-          Manage all your saved shipping addresses
+          Manage all your saved addresses
         </Text>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {shippingAddresses.map((address) => (
+        {allAddresses.map((address) => (
           <AddressCard key={address.id} address={address} region={region} />
         ))}
       </div>
@@ -106,23 +113,35 @@ const AddressCard: React.FC<AddressCardProps> = ({ address, region }) => {
         data-testid="address-container"
       >
         <div className="flex flex-col">
-          <div className="flex items-center gap-x-2 mb-2">
-            <Heading
-              className="text-left text-base-semi"
-              data-testid="address-name"
-            >
-              {address.first_name} {address.last_name}
-            </Heading>
-            {address.is_default_shipping && (
-              <span className="text-xs bg-ui-bg-interactive text-ui-fg-on-interactive px-2 py-1 rounded">
-                Default Shipping
-              </span>
-            )}
-            {address.is_default_billing && (
-              <span className="text-xs bg-ui-bg-interactive text-ui-fg-on-interactive px-2 py-1 rounded">
-                Default Billing
-              </span>
-            )}
+          <div className="flex flex-col gap-2 mb-2">
+            <div className="flex items-center gap-x-2">
+              <Heading
+                className="text-left text-base-semi"
+                data-testid="address-name"
+              >
+                {address.first_name} {address.last_name}
+              </Heading>
+            </div>
+            <div className="flex items-center gap-x-2 flex-wrap">
+              {address.is_default_billing ? (
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">
+                  Default Billing
+                </span>
+              ) : (
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                  Billing
+                </span>
+              )}
+              {address.is_default_shipping ? (
+                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
+                  Default Shipping
+                </span>
+              ) : (
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                  Shipping
+                </span>
+              )}
+            </div>
           </div>
           {address.company && (
             <Text
