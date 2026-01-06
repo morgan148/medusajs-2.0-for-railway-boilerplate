@@ -123,22 +123,19 @@ const AddressCard: React.FC<AddressCardProps> = ({ address, region }) => {
               </Heading>
             </div>
             <div className="flex items-center gap-x-2 flex-wrap">
-              {address.is_default_billing ? (
+              {address.is_default_billing && (
                 <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">
                   Default Billing
                 </span>
-              ) : (
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                  Billing
-                </span>
               )}
-              {address.is_default_shipping ? (
+              {address.is_default_shipping && (
                 <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
                   Default Shipping
                 </span>
-              ) : (
+              )}
+              {!address.is_default_billing && !address.is_default_shipping && (
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                  Shipping
+                  Additional Address
                 </span>
               )}
             </div>
