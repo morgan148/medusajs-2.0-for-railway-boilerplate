@@ -3,15 +3,34 @@ import "server-only"
 import { cookies } from "next/headers"
 
 /**
- * Gets all cookies from the Next.js request and formats them as a Cookie header string.
- * This is needed to forward cookies from the browser to the backend when making server-side requests.
+ * List of Medusa-related cookie names that should be forwarded to the backend.
+ * Only these cookies are forwarded to avoid:
+ * - Hitting HTTP header size limits (typically 8-16KB)
+ * - Security concerns with forwarding unnecessary cookies
+ * - Performance issues with large headers
+ */
+const MEDUSA_COOKIE_NAMES = [
+  '_medusa_jwt',        // Authentication token
+  '_medusa_cart_id',    // Cart session ID
+  '_medusa_onboarding', // Onboarding state (if used)
+] as const
+
+/**
+ * Gets only Medusa-related cookies from the Next.js request and formats them as a Cookie header string.
+ * This filters out unnecessary cookies (analytics, third-party, etc.) to:
+ * - Prevent hitting HTTP header size limits
+ * - Improve security by not forwarding unrelated cookies
+ * - Reduce bandwidth and improve performance
  */
 export const getCookieHeader = async (): Promise<string> => {
   const cookiesStore = await cookies()
   const cookiePairs: string[] = []
   
+  // Only forward Medusa-related cookies
   cookiesStore.getAll().forEach((cookie) => {
-    cookiePairs.push(`${cookie.name}=${cookie.value}`)
+    if (MEDUSA_COOKIE_NAMES.includes(cookie.name as any)) {
+      cookiePairs.push(`${cookie.name}=${cookie.value}`)
+    }
   })
   
   return cookiePairs.join("; ")
