@@ -79,8 +79,10 @@ export const getAuthHeaders = async (): Promise<Record<string, string>> => {
       hasAuth: !!headers.authorization,
       hasCookie: !!headers.cookie,
       cookieLength: headers.cookie?.length || 0,
-      cookiePreview: headers.cookie?.substring(0, 50) + "..." || "none",
+      cookiePreview: headers.cookie?.substring(0, 100) || "none",
       tokenFromCookie: !!token,
+      tokenPreview: token ? token.substring(0, 20) + "..." : "none",
+      allCookies: (await cookies()).getAll().map(c => c.name),
     })
   }
   

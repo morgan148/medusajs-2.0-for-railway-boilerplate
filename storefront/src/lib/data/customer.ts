@@ -24,7 +24,7 @@ export const getCustomer = async function () {
   }
   
   return await sdk.store.customer
-    .retrieve({}, {}, authHeaders)
+    .retrieve({}, authHeaders)
     .then(({ customer }) => customer)
     .catch((err) => {
       // Log error in development to help debug
@@ -95,18 +95,26 @@ export async function login(_currentState: unknown, formData: FormData) {
     const loginResult = await sdk.auth.login("customer", "emailpass", { email, password })
     const token = typeof loginResult === "string" ? loginResult : loginResult.location
     
-    // Set the cookie first - this must happen before redirect
+    // Set the cookie - this will be in the response headers
     await setAuthToken(token)
     
     // Revalidate tags to ensure fresh data after login
     revalidateTag("customer")
     revalidateTag("auth")
     
-    // Return success instead of redirecting - let the client handle the redirect
-    // This ensures the cookie is set before navigation
-    return { success: true, redirect: true }
+    // Get country code from headers to build proper redirect URL
+    const { headers } = await import("next/headers")
+    const headersList = await headers()
+    const referer = headersList.get("referer") || ""
+    // Extract country code from referer URL (e.g., /us/account/login -> us)
+    const countryCodeMatch = referer.match(/\/([a-z]{2})\//)
+    const countryCode = countryCodeMatch ? countryCodeMatch[1] : "us"
+    
+    // Use redirect() - the cookie is set in the response, so it will be available
+    // in the next request after the redirect completes
+    redirect(`/${countryCode}/account`)
   } catch (error: any) {
-    // If it's a redirect error, re-throw it so Next.js can handle it
+    // If it's a redirect error, that's expected - don't catch it
     if (error?.message?.includes("NEXT_REDIRECT") || error?.digest?.startsWith("NEXT_REDIRECT")) {
       throw error
     }
@@ -165,7 +173,7 @@ export const addCustomerAddress = async (
   if (isBillingAddress) {
     try {
       // Fetch customer directly to avoid cache issues
-      const { customer } = await sdk.store.customer.retrieve({}, {}, await getAuthHeaders())
+      const { customer } = await sdk.store.customer.retrieve({}, await getAuthHeaders())
       if (customer?.addresses) {
         // Find existing default billing address
         const existingDefaultBilling = customer.addresses.find(
@@ -258,7 +266,7 @@ export const updateCustomerAddress = async (
     // For billing address idempotency: remove default billing from other addresses
     try {
       // Fetch customer directly to avoid cache issues
-      const { customer } = await sdk.store.customer.retrieve({}, {}, await getAuthHeaders())
+      const { customer } = await sdk.store.customer.retrieve({}, await getAuthHeaders())
       if (customer?.addresses) {
         const existingDefaultBilling = customer.addresses.find(
           (addr) => addr.is_default_billing && addr.id !== addressId

@@ -1,6 +1,4 @@
 import { useFormState } from "react-dom"
-import { useRouter, useParams } from "next/navigation"
-import { useEffect } from "react"
 
 import { LOGIN_VIEW } from "@modules/account/templates/login-template"
 import Input from "@modules/common/components/input"
@@ -13,17 +11,7 @@ type Props = {
 }
 
 const Login = ({ setCurrentView }: Props) => {
-  const router = useRouter()
-  const { countryCode } = useParams() as { countryCode: string }
   const [message, formAction] = useFormState(login, null)
-  
-  // Handle successful login redirect
-  useEffect(() => {
-    if (message && typeof message === 'object' && message.success && message.redirect) {
-      // Use window.location for a full page reload to ensure cookie is available
-      window.location.href = `/${countryCode}/account`
-    }
-  }, [message, countryCode])
 
   return (
     <div
@@ -58,6 +46,7 @@ const Login = ({ setCurrentView }: Props) => {
           error={message && typeof message === 'object' && !message.success ? message.error : typeof message === 'string' ? message : null} 
           data-testid="login-error-message" 
         />
+        {/* Note: redirect() in Server Actions will cause a redirect - no need to handle it client-side */}
         <SubmitButton data-testid="sign-in-button" className="w-full mt-6">
           Sign in
         </SubmitButton>
