@@ -76,25 +76,35 @@ export async function login(_currentState: unknown, formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
 
+  let token: string
   try {
-    const token = await sdk.auth.login("customer", "emailpass", { email, password })
-    await setAuthToken(typeof token === "string" ? token : token.location)
+    const loginResult = await sdk.auth.login("customer", "emailpass", { email, password })
+    token = typeof loginResult === "string" ? loginResult : loginResult.location
+    await setAuthToken(token)
+    // Revalidate tags to ensure fresh data after login
     revalidateTag("customer")
     revalidateTag("auth")
-    
-    // Get country code from headers to build proper redirect URL
-    const { headers } = await import("next/headers")
-    const headersList = await headers()
-    const referer = headersList.get("referer") || ""
-    // Extract country code from referer URL (e.g., /us/account/login -> us)
-    const countryCodeMatch = referer.match(/\/([a-z]{2})\//)
-    const countryCode = countryCodeMatch ? countryCodeMatch[1] : "us"
-    
-    // Redirect to account overview after successful login
-    redirect(`/${countryCode}/account`)
   } catch (error: any) {
+    // If it's a redirect error, re-throw it so Next.js can handle it
+    if (error?.message?.includes("NEXT_REDIRECT") || error?.digest?.startsWith("NEXT_REDIRECT")) {
+      throw error
+    }
     return error.toString()
   }
+  
+  // Get country code from headers to build proper redirect URL
+  // Do this outside try/catch so redirect() can throw its special error
+  const { headers } = await import("next/headers")
+  const headersList = await headers()
+  const referer = headersList.get("referer") || ""
+  // Extract country code from referer URL (e.g., /us/account/login -> us)
+  const countryCodeMatch = referer.match(/\/([a-z]{2})\//)
+  const countryCode = countryCodeMatch ? countryCodeMatch[1] : "us"
+  
+  // Redirect to account overview after successful login
+  // redirect() throws NEXT_REDIRECT - this is expected and Next.js handles it
+  // The cookie is already set, so the next request will have the token
+  redirect(`/${countryCode}/account`)
 }
 
 export async function signout(countryCode: string) {
