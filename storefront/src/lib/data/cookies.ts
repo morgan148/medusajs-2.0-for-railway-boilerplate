@@ -53,11 +53,24 @@ export const getAuthHeaders = async (): Promise<Record<string, string>> => {
     headers.authorization = `Bearer ${token}`
   }
   
-  // Always include Cookie header to forward all cookies to the backend
-  // This is critical for session-based auth when making requests from Server Actions
-  // Use lowercase key - SDK will handle HTTP header capitalization
+  // Build cookie header - always include the JWT token if we have it
+  const cookiePairs: string[] = []
+  if (token) {
+    cookiePairs.push(`_medusa_jwt=${token}`)
+  }
+  // Add other Medusa cookies from getCookieHeader (cart_id, etc.)
   if (cookieHeader) {
-    headers.cookie = cookieHeader
+    // Parse existing cookie header and add non-JWT cookies
+    cookieHeader.split("; ").forEach((pair) => {
+      if (!pair.startsWith("_medusa_jwt=")) {
+        cookiePairs.push(pair)
+      }
+    })
+  }
+  
+  // Always include Cookie header if we have any cookies
+  if (cookiePairs.length > 0) {
+    headers.cookie = cookiePairs.join("; ")
   }
   
   // Debug logging in development
@@ -67,6 +80,7 @@ export const getAuthHeaders = async (): Promise<Record<string, string>> => {
       hasCookie: !!headers.cookie,
       cookieLength: headers.cookie?.length || 0,
       cookiePreview: headers.cookie?.substring(0, 50) + "..." || "none",
+      tokenFromCookie: !!token,
     })
   }
   

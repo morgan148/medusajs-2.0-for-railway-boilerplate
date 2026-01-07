@@ -11,13 +11,26 @@ import { getAuthHeaders, removeAuthToken, setAuthToken } from "./cookies"
 
 export const getCustomer = cache(async function () {
   const authHeaders = await getAuthHeaders()
+  
+  // Debug logging in development
+  if (process.env.NODE_ENV === "development") {
+    console.log("[getCustomer] Headers:", {
+      hasAuth: !!authHeaders.authorization,
+      hasCookie: !!authHeaders.cookie,
+      cookiePreview: authHeaders.cookie?.substring(0, 50) || "none",
+    })
+  }
+  
   return await sdk.store.customer
     .retrieve({}, {}, authHeaders)
     .then(({ customer }) => customer)
     .catch((err) => {
       // Log error in development to help debug
       if (process.env.NODE_ENV === "development") {
-        console.error("[getCustomer] Error:", err.message, "Headers sent:", authHeaders)
+        console.error("[getCustomer] Error:", err.message, "Status:", err.response?.status, "Headers sent:", {
+          hasAuth: !!authHeaders.authorization,
+          hasCookie: !!authHeaders.cookie,
+        })
       }
       return null
     })
