@@ -41,34 +41,30 @@ export const getCookieHeader = async (): Promise<string> => {
  * The Cookie header forwards all cookies from the browser request to the backend,
  * which is essential for session-based authentication in server-side contexts.
  */
-export const getAuthHeaders = async (): Promise<{ 
-  authorization?: string
-  cookie?: string
-}> => {
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
   const cookiesStore = await cookies()
   const token = cookiesStore.get("_medusa_jwt")?.value
   const cookieHeader = await getCookieHeader()
   
-  const headers: { authorization?: string; cookie?: string } = {}
+  const headers: Record<string, string> = {}
   
   if (token) {
-    headers.authorization = `Bearer ${token}`
+    headers.Authorization = `Bearer ${token}`
   }
   
   // Always include Cookie header to forward all cookies to the backend
   // This is critical for session-based auth when making requests from Server Actions
-  // Using lowercase 'cookie' as some HTTP clients are case-sensitive
   if (cookieHeader) {
-    headers.cookie = cookieHeader
+    headers.Cookie = cookieHeader
   }
   
   // Debug logging in development
   if (process.env.NODE_ENV === "development") {
     console.log("[getAuthHeaders] Generated headers:", {
-      hasAuth: !!headers.authorization,
-      hasCookie: !!headers.cookie,
-      cookieLength: headers.cookie?.length || 0,
-      cookiePreview: headers.cookie?.substring(0, 50) + "..." || "none",
+      hasAuth: !!headers.Authorization,
+      hasCookie: !!headers.Cookie,
+      cookieLength: headers.Cookie?.length || 0,
+      cookiePreview: headers.Cookie?.substring(0, 50) + "..." || "none",
     })
   }
   

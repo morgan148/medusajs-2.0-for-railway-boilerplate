@@ -11,9 +11,8 @@ import { getAuthHeaders, removeAuthToken, setAuthToken } from "./cookies"
 
 export const getCustomer = cache(async function () {
   const authHeaders = await getAuthHeaders()
-  // Spread headers into options object like cart.retrieve does
   return await sdk.store.customer
-    .retrieve({}, { ...authHeaders } as any)
+    .retrieve({}, {}, authHeaders)
     .then(({ customer }) => customer)
     .catch((err) => {
       // Log error in development to help debug

@@ -13,8 +13,9 @@ import { getRegion } from "./regions"
 export async function retrieveCart() {
   const cartId = await getCartId()
   if (!cartId) return null
+  const authHeaders = await getAuthHeaders()
   return await sdk.store.cart
-    .retrieve(cartId, {}, { next: { tags: ["cart"] }, ...(await getAuthHeaders()) })
+    .retrieve(cartId, {}, { next: { tags: ["cart"] }, ...authHeaders })
     .then(({ cart }) => cart)
     .catch(() => null)
 }

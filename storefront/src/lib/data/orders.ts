@@ -11,7 +11,8 @@ export const retrieveOrder = cache(async function (id: string) {
   return sdk.store.order
     .retrieve(
       id,
-      { fields: "*payment_collections.payments", ...authHeaders } as any
+      { fields: "*payment_collections.payments" },
+      authHeaders
     )
     .then(({ order }) => order)
     .catch((err) => {
@@ -28,7 +29,7 @@ export const listOrders = cache(async function (
 ) {
   const authHeaders = await getAuthHeaders()
   return sdk.store.order
-    .list({ limit, offset }, { ...authHeaders } as any)
+    .list({ limit, offset }, authHeaders)
     .then(({ orders }) => orders)
     .catch((err) => {
       if (process.env.NODE_ENV === "development") {
