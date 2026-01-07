@@ -77,12 +77,21 @@ export async function login(_currentState: unknown, formData: FormData) {
   const password = formData.get("password") as string
 
   try {
-    await sdk.auth
-      .login("customer", "emailpass", { email, password })
-      .then(async (token) => {
-        await setAuthToken(typeof token === "string" ? token : token.location)
-        revalidateTag("customer")
-      })
+    const token = await sdk.auth.login("customer", "emailpass", { email, password })
+    await setAuthToken(typeof token === "string" ? token : token.location)
+    revalidateTag("customer")
+    revalidateTag("auth")
+    
+    // Get country code from headers to build proper redirect URL
+    const { headers } = await import("next/headers")
+    const headersList = await headers()
+    const referer = headersList.get("referer") || ""
+    // Extract country code from referer URL (e.g., /us/account/login -> us)
+    const countryCodeMatch = referer.match(/\/([a-z]{2})\//)
+    const countryCode = countryCodeMatch ? countryCodeMatch[1] : "us"
+    
+    // Redirect to account overview after successful login
+    redirect(`/${countryCode}/account`)
   } catch (error: any) {
     return error.toString()
   }
