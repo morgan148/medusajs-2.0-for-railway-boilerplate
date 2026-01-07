@@ -9,7 +9,9 @@ import { redirect } from "next/navigation"
 import { cache } from "react"
 import { getAuthHeaders, removeAuthToken, setAuthToken } from "./cookies"
 
-export const getCustomer = cache(async function () {
+// Don't use cache() here because it caches based on function signature, not cookies
+// This means if called before login, it would cache null and return that after login
+export const getCustomer = async function () {
   const authHeaders = await getAuthHeaders()
   
   // Debug logging in development
@@ -34,7 +36,7 @@ export const getCustomer = cache(async function () {
       }
       return null
     })
-})
+}
 
 export const updateCustomer = cache(async function (
   body: HttpTypes.StoreUpdateCustomer
