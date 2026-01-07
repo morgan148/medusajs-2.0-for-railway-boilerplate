@@ -95,7 +95,15 @@ const FluidPayPaymentButton = ({
         await sleep(1500)
 
         console.log("[PaymentButton] Finalizing order...")
-        await placeOrder()
+        try {
+          await placeOrder()
+        } catch (err: any) {
+          // NEXT_REDIRECT is expected when redirect() is called - suppress the error
+          if (err?.message?.includes("NEXT_REDIRECT")) {
+            return // Redirect is happening, this is expected
+          }
+          throw err // Re-throw other errors
+        }
       } catch (err: any) {
         console.error("[PaymentButton] checkout Error:", err)
         setErrorMessage(err.message || "An error occurred during payment authorization.")
@@ -168,11 +176,23 @@ const StripePaymentButton = ({
       .then(({ error, paymentIntent }) => {
         if (error) {
           const pi = error.payment_intent
-          if ((pi && pi.status === "requires_capture") || (pi && pi.status === "succeeded")) { placeOrder().catch((err) => setErrorMessage(err.message)).finally(() => setSubmitting(false)); }
+          if ((pi && pi.status === "requires_capture") || (pi && pi.status === "succeeded")) { 
+            placeOrder().catch((err) => {
+              // NEXT_REDIRECT is expected - suppress the error
+              if (!err?.message?.includes("NEXT_REDIRECT") && !err?.digest?.startsWith("NEXT_REDIRECT")) {
+                setErrorMessage(err.message)
+              }
+            }).finally(() => setSubmitting(false))
+          }
           setErrorMessage(error.message || null); return;
         }
         if ((paymentIntent && paymentIntent.status === "requires_capture") || paymentIntent.status === "succeeded") {
-           placeOrder().catch((err) => setErrorMessage(err.message)).finally(() => setSubmitting(false));
+           placeOrder().catch((err) => {
+             // NEXT_REDIRECT is expected - suppress the error
+             if (!err?.message?.includes("NEXT_REDIRECT") && !err?.digest?.startsWith("NEXT_REDIRECT")) {
+               setErrorMessage(err.message)
+             }
+           }).finally(() => setSubmitting(false));
         }
       })
   }
@@ -194,7 +214,12 @@ const PayPalPaymentButton = ({
   const handlePayment = async (_data: OnApproveData, actions: OnApproveActions) => {
     actions?.order?.authorize().then((authorization) => {
         if (authorization.status !== "COMPLETED") { setErrorMessage(`An error occurred, status: ${authorization.status}`); return; }
-        placeOrder().catch((err) => setErrorMessage(err.message)).finally(() => setSubmitting(false));
+        placeOrder().catch((err) => {
+          // NEXT_REDIRECT is expected - suppress the error
+          if (!err?.message?.includes("NEXT_REDIRECT") && !err?.digest?.startsWith("NEXT_REDIRECT")) {
+            setErrorMessage(err.message)
+          }
+        }).finally(() => setSubmitting(false));
       }).catch(() => { setErrorMessage(`An unknown error occurred, please try again.`); setSubmitting(false); })
   }
   const [{ isPending, isResolved }] = usePayPalScriptReducer()

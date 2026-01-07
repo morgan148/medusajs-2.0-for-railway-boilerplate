@@ -14,8 +14,13 @@ export async function retrieveCart() {
   const cartId = await getCartId()
   if (!cartId) return null
   const authHeaders = await getAuthHeaders()
+  // Merge Next.js cache options with auth headers
+  const headers = {
+    ...authHeaders,
+    next: { tags: ["cart"] }
+  }
   return await sdk.store.cart
-    .retrieve(cartId, {}, { next: { tags: ["cart"] }, ...authHeaders })
+    .retrieve(cartId, {}, headers)
     .then(({ cart }) => cart)
     .catch(() => null)
 }
@@ -133,6 +138,8 @@ export async function placeOrder() {
   if (cartRes?.type === "order") {
     const countryCode = cartRes.order.shipping_address?.country_code?.toLowerCase()
     await removeCartId()
+    // redirect() throws NEXT_REDIRECT error - this is expected behavior in Next.js
+    // The error will be caught by Next.js and handled properly
     redirect(`/${countryCode}/order/confirmed/${cartRes?.order.id}`)
   }
   return cartRes.cart

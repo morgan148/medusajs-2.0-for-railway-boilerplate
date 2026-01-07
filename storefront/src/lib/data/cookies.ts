@@ -49,22 +49,24 @@ export const getAuthHeaders = async (): Promise<Record<string, string>> => {
   const headers: Record<string, string> = {}
   
   if (token) {
-    headers.Authorization = `Bearer ${token}`
+    // Use lowercase key - SDK will handle HTTP header capitalization
+    headers.authorization = `Bearer ${token}`
   }
   
   // Always include Cookie header to forward all cookies to the backend
   // This is critical for session-based auth when making requests from Server Actions
+  // Use lowercase key - SDK will handle HTTP header capitalization
   if (cookieHeader) {
-    headers.Cookie = cookieHeader
+    headers.cookie = cookieHeader
   }
   
   // Debug logging in development
   if (process.env.NODE_ENV === "development") {
     console.log("[getAuthHeaders] Generated headers:", {
-      hasAuth: !!headers.Authorization,
-      hasCookie: !!headers.Cookie,
-      cookieLength: headers.Cookie?.length || 0,
-      cookiePreview: headers.Cookie?.substring(0, 50) + "..." || "none",
+      hasAuth: !!headers.authorization,
+      hasCookie: !!headers.cookie,
+      cookieLength: headers.cookie?.length || 0,
+      cookiePreview: headers.cookie?.substring(0, 50) + "..." || "none",
     })
   }
   
