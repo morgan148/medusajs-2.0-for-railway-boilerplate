@@ -2,7 +2,7 @@
 
 A workflow is a series of queries and actions that complete a task.
 
-The workflow is created in a TypeScript or JavaScript file under the `src/workflows` directory.
+The workflow is created in a TypeScript or JavaScript file under the `src/workflows` directory..
 
 For example:
 
